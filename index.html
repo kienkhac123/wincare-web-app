@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý sửa chữa Laptop - Wincare.vn</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <div>
+                    <h1>🏢 WINCARE - QUẢN LÝ SỬA CHỮA LAPTOP</h1>
+                    <p>Cửa hàng sửa chữa laptop chuyên nghiệp</p>
+                </div>
+                <button id="openCreateModal" class="btn-primary">➕ Tạo phiếu mới</button>
+            </div>
+        </header>
+
+        <!-- KHUNG THÔNG BÁO NHANH -->
+        <section class="summary-section">
+            <div class="summary-card summary-stale">
+                <h3>⚠️ Máy tồn đọng chưa xử lí</h3>
+                <div id="staleList" class="summary-list"></div>
+            </div>
+            <div class="summary-card summary-today">
+                <h3>ℹ️ Máy chưa xử lí</h3>
+                <div id="todayList" class="summary-list"></div>
+            </div>
+        </section>
+
+        <!-- BẢNG DANH SÁCH PHIẾU -->
+        <section class="table-section">
+            <h2>📋 Danh sách máy đang sửa</h2>
+
+            <div class="filter-bar">
+                <div class="filter-item search-item">
+                    <label for="searchInput">Tìm kiếm</label>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Nhập tên khách / số điện thoại / tên máy..."
+                    >
+                </div>
+                <div class="filter-item">
+                    <label for="statusFilter">Lọc theo tình trạng</label>
+                    <select id="statusFilter">
+                        <option value="all">Tất cả tình trạng</option>
+                        <option value="Chưa xử lý">Chưa xử lý</option>
+                        <option value="Đang xử lý">Đang xử lý</option>
+                        <option value="Đã xử lý">Đã xử lý</option>
+                        <option value="Đã trả máy">Đã trả máy</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="repairTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ngày nhận</th>
+                            <th>Khách hàng</th>
+                            <th>SĐT</th>
+                            <th>Máy</th>
+                            <th>Ghi chú</th>
+                            <th>Tình trạng</th>
+                            <th>Ngày trả</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="repairList"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- MODAL TẠO PHIẾU -->
+    <div id="createModal" class="modal">
+        <div class="modal-content form-modal-content">
+            <span id="closeCreateModal" class="close">&times;</span>
+            <div class="modal-header">
+                <h2>📝 Tạo phiếu tiếp nhận mới</h2>
+            </div>
+            <div class="modal-body">
+                <form id="repairForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Tên khách hàng <span class="required">*</span></label>
+                            <input type="text" id="tenKhach" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Số điện thoại <span class="required">*</span></label>
+                            <input type="tel" id="sdt" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Tên máy <span class="required">*</span></label>
+                            <input type="text" id="tenMay" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Mô tả lỗi <span class="required">*</span></label>
+                            <textarea id="moTaLoi" required rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Phương án xử lí <span class="required">*</span></label>
+                            <select id="huongXuLy" required>
+                                <option value="">Chọn phương án xử lí...</option>
+                                <option value="Xử lí tại cửa hàng">Xử lí tại cửa hàng</option>
+                                <option value="Gửi trung tâm bảo hành">Gửi trung tâm bảo hành</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Ghi chú</label>
+                            <textarea id="ghiChu" rows="2" placeholder="Ghi chú thêm..."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">💾 Tạo phiếu</button>
+                        <button type="button" id="cancelCreate" class="btn-secondary">Hủy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NHẬP HÓA ĐƠN -->
+    <div id="invoiceModal" class="modal">
+        <div class="modal-content form-modal-content">
+            <span id="closeInvoiceModal" class="close">&times;</span>
+            <div class="modal-header">
+                <h2>🧾 Nhập thông tin hóa đơn</h2>
+            </div>
+            <div class="modal-body">
+                <form id="invoiceForm">
+                    <input type="hidden" id="invoiceRepairId">
+
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Thiết bị sửa chữa <span class="required">*</span></label>
+                            <input type="text" id="invoiceDevice" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Dịch vụ thay thế</label>
+                            <input type="text" id="invoiceService">
+                        </div>
+                        <div class="form-group">
+                            <label>Số lượng</label>
+                            <input type="number" id="invoiceQty" min="1" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Thành tiền</label>
+                            <input type="number" id="invoiceAmount" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button type="button" id="addInvoiceLine" class="btn-primary mini-btn">＋ Thêm dịch vụ</button>
+                        </div>
+                    </div>
+
+                    <div id="invoiceLines"></div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Chiết khấu</label>
+                            <input type="number" id="invoiceDiscount" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Tổng tiền</label>
+                            <input type="number" id="invoiceTotal" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">💾 Lưu & In hóa đơn</button>
+                        <button type="button" id="cancelInvoice" class="btn-secondary">Hủy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL IN PHIẾU -->
+    <div id="printModal" class="modal">
+        <div class="modal-content">
+            <span id="closePrintIcon" class="close">&times;</span>
+            <div id="printContent"></div>
+            <div class="modal-actions">
+                <button onclick="window.print()" class="btn-print">🖨️ In phiếu</button>
+                <button id="closePrint" class="btn-secondary">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING ACTION BUTTONS -->
+    <div class="floating-actions">
+        <button id="fabCreate" class="fab-btn fab-create" title="Tạo phiếu mới">+</button>
+        <button id="fabTop" class="fab-btn fab-top" title="Lên đầu trang">↑</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
