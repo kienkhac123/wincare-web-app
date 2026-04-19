@@ -140,7 +140,9 @@ class RepairManager {
                 sdt: (document.getElementById('sdt')?.value || '').trim(),
                 tenMay: (document.getElementById('tenMay')?.value || '').trim(),
                 moTaLoi: (document.getElementById('moTaLoi')?.value || '').trim(),
-                phuongAnXuLi: (document.getElementById('phuongAnXuLi')?.value || '').trim(),
+                phuongAnXuLi: (document.getElementById('phuongAnXuLi')?.value || '')
+                    .trim()
+                    .replace(/^Xử\s*lí tại cửa hàng$/i, 'Xử lý tại cửa hàng'),
                 huongXuLyNoiBo: 'Thay linh kiện mới',
                 tinhTrang: 'Chưa xử lý',
                 ngayTra: null,
