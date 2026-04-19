@@ -68,17 +68,6 @@ h2 {
     font-size: 1.8em;
 }
 
-/* ACTION + FORM STYLES */
-.action-section {
-    background: var(--surface);
-    padding: 14px;
-    border-radius: 14px;
-    box-shadow: var(--shadow);
-    margin-bottom: 16px;
-    text-align: center;
-    border: 1px solid var(--border);
-}
-
 .form-modal-content {
     max-width: 900px;
     width: 95%;
@@ -193,7 +182,6 @@ textarea {
     margin-left: 6px;
 }
 
-/* TABLE STYLES */
 .summary-section {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -237,16 +225,6 @@ textarea {
     padding: 8px;
     font-size: 13px;
     color: #0f2a3d;
-}
-
-.summary-item.clickable {
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.summary-item.clickable:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .summary-desc {
@@ -319,15 +297,6 @@ textarea {
     border-radius: 12px;
 }
 
-.repair-row.jump-highlight {
-    animation: jumpFlash 1.5s ease;
-}
-
-@keyframes jumpFlash {
-    0% { background: #fff5b1; }
-    100% { background: transparent; }
-}
-
 .repair-detail-row td {
     background: var(--surface-soft);
     border-bottom: 2px solid var(--border);
@@ -384,14 +353,6 @@ tr:hover {
     background: #f8f9fa;
 }
 
-/* Dark mode: hover sáng + chữ đen để không mất nội dung */
-
-.status-chua { color: #e74c3c; font-weight: bold; }
-.status-dang { color: #f39c12; font-weight: bold; }
-.status-da { color: #27ae60; font-weight: bold; }
-.status-tra { color: #2ecc71; font-weight: bold; background: #d5f4e6; padding: 4px 8px; border-radius: 20px; }
-
-/* MODAL */
 .modal {
     display: none;
     position: fixed;
@@ -435,76 +396,23 @@ tr:hover {
     gap: 10px;
 }
 
-/* PRINT STYLES */
-@media print {
-    @page { size: 80mm auto; margin: 0; }
+.invoice-lines-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 14px;
+    font-size: 14px;
+}
 
-    html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-    }
+.invoice-lines-table th,
+.invoice-lines-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
 
-    body * {
-        visibility: hidden !important;
-    }
-
-    #printContent, #printContent * {
-        visibility: visible !important;
-    }
-
-    #printModal {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: transparent !important;
-    }
-
-    #printModal .modal-content {
-        position: static !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        max-width: none !important;
-        max-height: none !important;
-        overflow: visible !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        border-radius: 0 !important;
-        background: transparent !important;
-    }
-
-    #printContent {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    .modal-actions,
-    #closePrintIcon {
-        display: none !important;
-    }
-
-    .print-receipt {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-        width: 100%;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #000;
-        border: none !important;
-        page-break-before: avoid !important;
-        break-before: avoid-page !important;
-    }
+.invoice-lines-table th {
+    background: #f5f5f5;
+    color: #333;
+    position: static;
 }
 
 /* MẪU IN THEO PHIẾU THAM CHIẾU */
@@ -635,26 +543,6 @@ tr:hover {
     border-top: 1px solid #000;
 }
 
-/* RESPONSIVE */
-.invoice-lines-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 10px 0 14px;
-    font-size: 14px;
-}
-
-.invoice-lines-table th,
-.invoice-lines-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-}
-
-.invoice-lines-table th {
-    background: #f5f5f5;
-    color: #333;
-    position: static;
-}
-
 .floating-actions {
     position: fixed;
     right: 18px;
@@ -700,6 +588,77 @@ tr:hover {
     background: #263645;
 }
 
+@media print {
+    @page { size: 80mm auto; margin: 0; }
+
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    body * {
+        visibility: hidden !important;
+    }
+
+    #printContent, #printContent * {
+        visibility: visible !important;
+    }
+
+    #printModal {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+
+    #printModal .modal-content {
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+    }
+
+    #printContent {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .modal-actions,
+    #closePrintIcon {
+        display: none !important;
+    }
+
+    .print-receipt {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        width: 100%;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #000;
+        border: none !important;
+        page-break-before: avoid !important;
+        break-before: avoid-page !important;
+    }
+}
+
 @media (max-width: 768px) {
     .form-grid {
         grid-template-columns: 1fr;
@@ -717,11 +676,11 @@ tr:hover {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .form-actions {
         flex-direction: column;
     }
-    
+
     th, td {
         padding: 10px 5px;
         font-size: 14px;
