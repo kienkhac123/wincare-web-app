@@ -200,7 +200,7 @@ app.put('/api/repairs/:id/status', async (req, res) => {
 
 initDatabase()
     .then(() => {
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`Wincare backend listening on http://0.0.0.0:${PORT}`);
         });
     })
