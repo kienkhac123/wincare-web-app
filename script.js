@@ -6,136 +6,7 @@ class RepairManager {
         this.statusFilter = 'all';
         this.expandedRepairId = null;
         this.currentInvoiceServices = [];
-        this.STORAGE_KEY = 'wincare_repairs';
         this.BACKUP_URL = 'https://script.google.com/macros/s/AKfycbwbBLpp8ydoZ42e3Ivv6pevuUX6d8uVI478NE511oVkJHIyBExD34Q1Ct13IVFAKJSz/exec';
-    }
-
-    get isLocalMode() {
-        const host = (window.location.hostname || '').toLowerCase();
-        return host === 'localhost' || host === '127.0.0.1';
-    }
-
-    getLocalRepairs() {
-        try {
-            const raw = localStorage.getItem(this.STORAGE_KEY);
-            if (!raw) return [];
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            console.error('getLocalRepairs error:', e);
-            return [];
-        }
-    }
-
-    saveLocalRepairs(repairs) {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(repairs || []));
-    }
-
-    ensureLocalSeedData() {
-        const existing = this.getLocalRepairs();
-        if (existing.length) {
-            const hasStale = existing.some((r) => {
-                const status = r?.tinhTrang;
-                const isProcessing = status === 'Chưa xử lý' || status === 'Đang xử lý';
-                return isProcessing && this.calcDayDiffFromNow(r?.ngayNhan) >= 1;
-            });
-
-            if (!hasStale) {
-                const now = new Date();
-                const autoSamples = [
-                    this.normalizeRepair({
-                        id: this.getNextLocalId(existing),
-                        ngayNhan: this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2)),
-                        tenKhach: 'Phạm Quốc Huy',
-                        sdt: '0901234567',
-                        tenMay: 'Dell Latitude 5420',
-                        moTaLoi: 'Không nhận sạc, pin tụt nhanh',
-                        phuongAnXuLi: 'Xử lý tại cửa hàng',
-                        tinhTrang: 'Chưa xử lý',
-                        ngayTra: null,
-                        ghiChu: 'Khách cần gấp trong tuần',
-                        workNote: '',
-                        invoice: null
-                    }),
-                    this.normalizeRepair({
-                        id: this.getNextLocalId(existing) + 1,
-                        ngayNhan: this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4)),
-                        tenKhach: 'Nguyễn Thị Mai',
-                        sdt: '0912345678',
-                        tenMay: 'HP ProBook 440',
-                        moTaLoi: 'Quạt kêu to, máy nóng',
-                        phuongAnXuLi: 'Xử lý tại cửa hàng',
-                        tinhTrang: 'Đang xử lý',
-                        ngayTra: null,
-                        ghiChu: 'Đã vệ sinh sơ bộ',
-                        workNote: '',
-                        invoice: null
-                    })
-                ];
-                const merged = [...autoSamples, ...existing];
-                this.saveLocalRepairs(merged);
-                return merged;
-            }
-
-            return existing;
-        }
-
-        const now = new Date();
-        const today = this.formatDateVN(now);
-        const twoDaysAgo = this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2));
-        const fourDaysAgo = this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4));
-        const seed = [
-            {
-                id: 1,
-                ngayNhan: today,
-                tenKhach: 'Nguyễn Văn An',
-                sdt: '0911111111',
-                tenMay: 'Dell Inspiron 15',
-                moTaLoi: 'Không lên nguồn',
-                phuongAnXuLi: 'Xử lý tại cửa hàng',
-                tinhTrang: 'Chưa xử lý',
-                ngayTra: null,
-                ghiChu: 'Khách cần gấp',
-                workNote: '',
-                invoice: null
-            },
-            {
-                id: 2,
-                ngayNhan: twoDaysAgo,
-                tenKhach: 'Trần Thị Bình',
-                sdt: '0922222222',
-                tenMay: 'HP Pavilion',
-                moTaLoi: 'Nóng máy, quạt kêu to',
-                phuongAnXuLi: 'Xử lý tại cửa hàng',
-                tinhTrang: 'Đang xử lý',
-                ngayTra: null,
-                ghiChu: '',
-                workNote: '',
-                invoice: null
-            },
-            {
-                id: 3,
-                ngayNhan: fourDaysAgo,
-                tenKhach: 'Lê Minh Cường',
-                sdt: '0933333333',
-                tenMay: 'MacBook Pro 2019',
-                moTaLoi: 'Bàn phím liệt vài nút',
-                phuongAnXuLi: 'Gửi trung tâm bảo hành',
-                tinhTrang: 'Chưa xử lý',
-                ngayTra: null,
-                ghiChu: 'Đã kiểm tra ngoại quan',
-                workNote: '',
-                invoice: null
-            }
-        ];
-
-        this.saveLocalRepairs(seed);
-        return seed;
-    }
-
-    getNextLocalId(list = this.repairs) {
-        const ids = (list || []).map(r => Number(r?.id) || 0);
-        return ids.length ? Math.max(...ids) + 1 : 1;
     }
 
     async init() {
@@ -246,14 +117,6 @@ class RepairManager {
 
     async fetchRepairs() {
         try {
-            if (this.isLocalMode) {
-                const data = this.ensureLocalSeedData();
-                this.repairs = Array.isArray(data)
-                    ? data.map((r, idx) => this.normalizeRepair(r, idx + 1))
-                    : [];
-                return;
-            }
-
             const res = await fetch('/api/repairs');
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -306,28 +169,19 @@ class RepairManager {
 
             if (!this.validateForm(payload)) return;
 
-            let saved;
+            const res = await fetch('/api/repairs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            if (this.isLocalMode) {
-                const nextId = this.repairs.length ? Math.max(...this.repairs.map(r => Number(r.id) || 0)) + 1 : 1;
-                saved = this.normalizeRepair({ ...payload, id: nextId }, nextId);
-                this.repairs = [saved, ...this.repairs];
-                this.saveLocalRepairs(this.repairs);
-            } else {
-                const res = await fetch('/api/repairs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    throw new Error(err.message || `HTTP ${res.status}`);
-                }
-
-                saved = this.normalizeRepair(await res.json(), this.repairs.length + 1);
-                await this.fetchRepairs();
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${res.status}`);
             }
+
+            const saved = this.normalizeRepair(await res.json(), this.repairs.length + 1);
+            await this.fetchRepairs();
 
             this.renderTable();
             this.renderSummaryCards();
@@ -467,28 +321,24 @@ class RepairManager {
         repair.ngayTra = nextNgayTra;
 
         try {
-            if (this.isLocalMode) {
-                this.saveLocalRepairs(this.repairs);
-            } else {
-                const res = await fetch(`/api/repairs/${id}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        tinhTrang: newStatus,
-                        ngayTra: nextNgayTra
-                    })
-                });
+            const res = await fetch(`/api/repairs/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tinhTrang: newStatus,
+                    ngayTra: nextNgayTra
+                })
+            });
 
-                if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    throw new Error(err.message || `HTTP ${res.status}`);
-                }
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${res.status}`);
+            }
 
-                const updated = await res.json();
-                const idx = this.repairs.findIndex(r => r.id === id);
-                if (idx >= 0) {
-                    this.repairs[idx] = this.normalizeRepair(updated, id);
-                }
+            const updated = await res.json();
+            const idx = this.repairs.findIndex(r => r.id === id);
+            if (idx >= 0) {
+                this.repairs[idx] = this.normalizeRepair(updated, id);
             }
 
             this.renderTable();
@@ -533,10 +383,6 @@ class RepairManager {
         if (!el) return;
         repair.workNote = (el.value || '').trim();
 
-        if (this.isLocalMode) {
-            this.saveLocalRepairs(this.repairs);
-        }
-
         this.showNotification('✅ Đã lưu ghi chú sửa chữa');
         await this.backupToDrive(repair);
     }
@@ -550,7 +396,7 @@ class RepairManager {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    source: this.isLocalMode ? 'local' : 'live',
+                    source: 'live',
                     timestamp: new Date().toISOString(),
                     data: repairData
                 })
