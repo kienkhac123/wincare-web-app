@@ -47,6 +47,18 @@ class RepairManager {
             this.renderTable();
         });
 
+        document.getElementById('staleList')?.addEventListener('click', (e) => {
+            const item = e.target.closest('.summary-item[data-repair-id]');
+            if (!item) return;
+            this.jumpToRepair(Number(item.dataset.repairId));
+        });
+
+        document.getElementById('todayList')?.addEventListener('click', (e) => {
+            const item = e.target.closest('.summary-item[data-repair-id]');
+            if (!item) return;
+            this.jumpToRepair(Number(item.dataset.repairId));
+        });
+
         document.getElementById('fabTop')?.addEventListener('click', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -87,8 +99,7 @@ class RepairManager {
             sdt: row?.sdt || '',
             tenMay: row?.tenMay || '',
             moTaLoi: row?.moTaLoi || '',
-            phuongAnXuLi: row?.phuongAnXuLi || 'Xử lí tại cửa hàng',
-            huongXuLyNoiBo: row?.huongXuLyNoiBo || 'Thay linh kiện mới',
+            phuongAnXuLi: row?.phuongAnXuLi || 'Xử lý tại cửa hàng',
             tinhTrang: row?.tinhTrang || 'Chưa xử lý',
             ngayTra: row?.ngayTra || null,
             ghiChu: row?.ghiChu || '',
@@ -143,7 +154,6 @@ class RepairManager {
                 phuongAnXuLi: (document.getElementById('phuongAnXuLi')?.value || '')
                     .trim()
                     .replace(/^Xử\s*lí tại cửa hàng$/i, 'Xử lý tại cửa hàng'),
-                huongXuLyNoiBo: 'Thay linh kiện mới',
                 tinhTrang: 'Chưa xử lý',
                 ngayTra: null,
                 ghiChu: (document.getElementById('ghiChu')?.value || '').trim(),
@@ -278,6 +288,23 @@ class RepairManager {
     toggleRepairDetails(id) {
         this.expandedRepairId = this.expandedRepairId === id ? null : id;
         this.renderTable();
+    }
+
+    jumpToRepair(id) {
+        if (!id || Number.isNaN(id)) return;
+        this.expandedRepairId = id;
+        this.renderTable();
+
+        const targetRow = document.querySelector(`.repair-row[data-id="${id}"]`);
+        if (!targetRow) return;
+
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetRow.classList.add('expanded');
+        targetRow.style.transition = 'box-shadow 0.3s ease';
+        targetRow.style.boxShadow = '0 0 0 3px rgba(0, 191, 255, 0.35)';
+        setTimeout(() => {
+            targetRow.style.boxShadow = '';
+        }, 1200);
     }
 
     saveRepairWorkNote(id) {
@@ -551,11 +578,11 @@ class RepairManager {
         const today = processing.filter(r => this.calcDayDiffFromNow(r.ngayNhan) === 0);
 
         staleEl.innerHTML = stale.length
-            ? stale.map(r => `<div class="summary-item"><div><strong>${r.tenKhach}</strong> - ${r.tenMay}</div><div class="summary-desc">${r.moTaLoi || '-'}</div><div class="summary-age">Tồn đọng ${this.calcDayDiffFromNow(r.ngayNhan)} ngày</div></div>`).join('')
+            ? stale.map(r => `<div class="summary-item" data-repair-id="${r.id}"><div><strong>${r.tenKhach}</strong> - ${r.tenMay}</div><div class="summary-desc">${r.moTaLoi || '-'}</div><div class="summary-age">Tồn đọng ${this.calcDayDiffFromNow(r.ngayNhan)} ngày</div></div>`).join('')
             : '<div class="summary-empty">Không có máy tồn đọng.</div>';
 
         todayEl.innerHTML = today.length
-            ? today.map(r => `<div class="summary-item"><div><strong>${r.tenKhach}</strong> - ${r.tenMay}</div><div class="summary-desc">${r.moTaLoi || '-'}</div></div>`).join('')
+            ? today.map(r => `<div class="summary-item" data-repair-id="${r.id}"><div><strong>${r.tenKhach}</strong> - ${r.tenMay}</div><div class="summary-desc">${r.moTaLoi || '-'}</div></div>`).join('')
             : '<div class="summary-empty">Không có máy chưa xử lí trong ngày.</div>';
     }
 

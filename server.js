@@ -46,7 +46,6 @@ async function initDatabase() {
                 tenMay VARCHAR(255) NOT NULL,
                 moTaLoi TEXT NOT NULL,
                 phuongAnXuLi VARCHAR(255) NOT NULL,
-                huongXuLyNoiBo VARCHAR(255) DEFAULT 'Thay linh kiện mới',
                 tinhTrang VARCHAR(100) DEFAULT 'Chưa xử lý',
                 ngayTra VARCHAR(20) NULL,
                 ghiChu TEXT NULL,
@@ -84,7 +83,7 @@ app.get('/api/repairs', async (req, res) => {
         const [rows] = await pool.query(`
             SELECT
                 id, ngayNhan, tenKhach, sdt, tenMay, moTaLoi,
-                phuongAnXuLi, huongXuLyNoiBo, tinhTrang, ngayTra, ghiChu, workNote
+                phuongAnXuLi, tinhTrang, ngayTra, ghiChu, workNote
             FROM repairs
             ORDER BY id DESC
         `);
@@ -109,7 +108,6 @@ app.post('/api/repairs', async (req, res) => {
             tenMay: String(req.body.tenMay || '').trim(),
             moTaLoi: String(req.body.moTaLoi || '').trim(),
             phuongAnXuLi: String(req.body.phuongAnXuLi || '').trim(),
-            huongXuLyNoiBo: req.body.huongXuLyNoiBo ? String(req.body.huongXuLyNoiBo).trim() : 'Thay linh kiện mới',
             tinhTrang: req.body.tinhTrang ? String(req.body.tinhTrang).trim() : 'Chưa xử lý',
             ngayTra: req.body.ngayTra || null,
             ghiChu: req.body.ghiChu ? String(req.body.ghiChu).trim() : '',
@@ -119,8 +117,8 @@ app.post('/api/repairs', async (req, res) => {
         const [result] = await pool.query(
             `
             INSERT INTO repairs
-            (ngayNhan, tenKhach, sdt, tenMay, moTaLoi, phuongAnXuLi, huongXuLyNoiBo, tinhTrang, ngayTra, ghiChu, workNote)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (ngayNhan, tenKhach, sdt, tenMay, moTaLoi, phuongAnXuLi, tinhTrang, ngayTra, ghiChu, workNote)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
                 payload.ngayNhan,
@@ -129,7 +127,6 @@ app.post('/api/repairs', async (req, res) => {
                 payload.tenMay,
                 payload.moTaLoi,
                 payload.phuongAnXuLi,
-                payload.huongXuLyNoiBo,
                 payload.tinhTrang,
                 payload.ngayTra,
                 payload.ghiChu,
@@ -141,7 +138,7 @@ app.post('/api/repairs', async (req, res) => {
             `
             SELECT
                 id, ngayNhan, tenKhach, sdt, tenMay, moTaLoi,
-                phuongAnXuLi, huongXuLyNoiBo, tinhTrang, ngayTra, ghiChu, workNote
+                phuongAnXuLi, tinhTrang, ngayTra, ghiChu, workNote
             FROM repairs
             WHERE id = ?
             `,
