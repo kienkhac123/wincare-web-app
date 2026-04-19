@@ -6,6 +6,136 @@ class RepairManager {
         this.statusFilter = 'all';
         this.expandedRepairId = null;
         this.currentInvoiceServices = [];
+        this.STORAGE_KEY = 'wincare_repairs';
+        this.BACKUP_URL = 'https://script.google.com/macros/s/AKfycbwbBLpp8ydoZ42e3Ivv6pevuUX6d8uVI478NE511oVkJHIyBExD34Q1Ct13IVFAKJSz/exec';
+    }
+
+    get isLocalMode() {
+        const host = (window.location.hostname || '').toLowerCase();
+        return host === 'localhost' || host === '127.0.0.1';
+    }
+
+    getLocalRepairs() {
+        try {
+            const raw = localStorage.getItem(this.STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            console.error('getLocalRepairs error:', e);
+            return [];
+        }
+    }
+
+    saveLocalRepairs(repairs) {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(repairs || []));
+    }
+
+    ensureLocalSeedData() {
+        const existing = this.getLocalRepairs();
+        if (existing.length) {
+            const hasStale = existing.some((r) => {
+                const status = r?.tinhTrang;
+                const isProcessing = status === 'Chưa xử lý' || status === 'Đang xử lý';
+                return isProcessing && this.calcDayDiffFromNow(r?.ngayNhan) >= 1;
+            });
+
+            if (!hasStale) {
+                const now = new Date();
+                const autoSamples = [
+                    this.normalizeRepair({
+                        id: this.getNextLocalId(existing),
+                        ngayNhan: this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2)),
+                        tenKhach: 'Phạm Quốc Huy',
+                        sdt: '0901234567',
+                        tenMay: 'Dell Latitude 5420',
+                        moTaLoi: 'Không nhận sạc, pin tụt nhanh',
+                        phuongAnXuLi: 'Xử lý tại cửa hàng',
+                        tinhTrang: 'Chưa xử lý',
+                        ngayTra: null,
+                        ghiChu: 'Khách cần gấp trong tuần',
+                        workNote: '',
+                        invoice: null
+                    }),
+                    this.normalizeRepair({
+                        id: this.getNextLocalId(existing) + 1,
+                        ngayNhan: this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4)),
+                        tenKhach: 'Nguyễn Thị Mai',
+                        sdt: '0912345678',
+                        tenMay: 'HP ProBook 440',
+                        moTaLoi: 'Quạt kêu to, máy nóng',
+                        phuongAnXuLi: 'Xử lý tại cửa hàng',
+                        tinhTrang: 'Đang xử lý',
+                        ngayTra: null,
+                        ghiChu: 'Đã vệ sinh sơ bộ',
+                        workNote: '',
+                        invoice: null
+                    })
+                ];
+                const merged = [...autoSamples, ...existing];
+                this.saveLocalRepairs(merged);
+                return merged;
+            }
+
+            return existing;
+        }
+
+        const now = new Date();
+        const today = this.formatDateVN(now);
+        const twoDaysAgo = this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2));
+        const fourDaysAgo = this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4));
+        const seed = [
+            {
+                id: 1,
+                ngayNhan: today,
+                tenKhach: 'Nguyễn Văn An',
+                sdt: '0911111111',
+                tenMay: 'Dell Inspiron 15',
+                moTaLoi: 'Không lên nguồn',
+                phuongAnXuLi: 'Xử lý tại cửa hàng',
+                tinhTrang: 'Chưa xử lý',
+                ngayTra: null,
+                ghiChu: 'Khách cần gấp',
+                workNote: '',
+                invoice: null
+            },
+            {
+                id: 2,
+                ngayNhan: twoDaysAgo,
+                tenKhach: 'Trần Thị Bình',
+                sdt: '0922222222',
+                tenMay: 'HP Pavilion',
+                moTaLoi: 'Nóng máy, quạt kêu to',
+                phuongAnXuLi: 'Xử lý tại cửa hàng',
+                tinhTrang: 'Đang xử lý',
+                ngayTra: null,
+                ghiChu: '',
+                workNote: '',
+                invoice: null
+            },
+            {
+                id: 3,
+                ngayNhan: fourDaysAgo,
+                tenKhach: 'Lê Minh Cường',
+                sdt: '0933333333',
+                tenMay: 'MacBook Pro 2019',
+                moTaLoi: 'Bàn phím liệt vài nút',
+                phuongAnXuLi: 'Gửi trung tâm bảo hành',
+                tinhTrang: 'Chưa xử lý',
+                ngayTra: null,
+                ghiChu: 'Đã kiểm tra ngoại quan',
+                workNote: '',
+                invoice: null
+            }
+        ];
+
+        this.saveLocalRepairs(seed);
+        return seed;
+    }
+
+    getNextLocalId(list = this.repairs) {
+        const ids = (list || []).map(r => Number(r?.id) || 0);
+        return ids.length ? Math.max(...ids) + 1 : 1;
     }
 
     async init() {
@@ -31,7 +161,13 @@ class RepairManager {
             this.saveInvoiceAndPrint();
         });
         document.getElementById('addInvoiceLine')?.addEventListener('click', () => this.addInvoiceService());
-        document.getElementById('invoiceDiscount')?.addEventListener('input', () => this.calculateInvoiceTotal());
+        document.getElementById('invoiceDiscount')?.addEventListener('input', (e) => {
+            this.formatCurrencyInput(e.target);
+            this.calculateInvoiceTotal();
+        });
+        document.getElementById('invoiceAmount')?.addEventListener('input', (e) => {
+            this.formatCurrencyInput(e.target);
+        });
         document.getElementById('closeInvoiceModal')?.addEventListener('click', () => this.closeModal('invoiceModal'));
         document.getElementById('cancelInvoice')?.addEventListener('click', () => this.closeModal('invoiceModal'));
 
@@ -110,6 +246,14 @@ class RepairManager {
 
     async fetchRepairs() {
         try {
+            if (this.isLocalMode) {
+                const data = this.ensureLocalSeedData();
+                this.repairs = Array.isArray(data)
+                    ? data.map((r, idx) => this.normalizeRepair(r, idx + 1))
+                    : [];
+                return;
+            }
+
             const res = await fetch('/api/repairs');
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -162,26 +306,36 @@ class RepairManager {
 
             if (!this.validateForm(payload)) return;
 
-            const res = await fetch('/api/repairs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            let saved;
 
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || `HTTP ${res.status}`);
+            if (this.isLocalMode) {
+                const nextId = this.repairs.length ? Math.max(...this.repairs.map(r => Number(r.id) || 0)) + 1 : 1;
+                saved = this.normalizeRepair({ ...payload, id: nextId }, nextId);
+                this.repairs = [saved, ...this.repairs];
+                this.saveLocalRepairs(this.repairs);
+            } else {
+                const res = await fetch('/api/repairs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || `HTTP ${res.status}`);
+                }
+
+                saved = this.normalizeRepair(await res.json(), this.repairs.length + 1);
+                await this.fetchRepairs();
             }
 
-            const saved = this.normalizeRepair(await res.json(), this.repairs.length + 1);
-            await this.fetchRepairs();
             this.renderTable();
             this.renderSummaryCards();
 
             document.getElementById('repairForm')?.reset();
             this.closeModal('createModal');
-            this.showPrintModal(saved, false);
             this.showNotification('✅ Tạo phiếu thành công');
+            await this.backupToDrive(saved);
         } catch (error) {
             console.error('submitForm error:', error);
             this.showNotification(`❌ Lỗi lưu dữ liệu: ${error.message}`, 'error');
@@ -209,7 +363,7 @@ class RepairManager {
         tbody.innerHTML = '';
 
         if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:#7f8c8d;">📭 Chưa có dữ liệu</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#7f8c8d;">📭 Chưa có dữ liệu</td></tr>';
             return;
         }
 
@@ -224,16 +378,19 @@ class RepairManager {
                 <td>${repair.sdt}</td>
                 <td>${repair.tenMay}</td>
                 <td>${notePreview}</td>
-                <td>${repair.tinhTrang}</td>
-                <td>${repair.ngayTra || '-'}</td>
                 <td>
-                    <button type="button" class="btn-print btn-action-print" data-id="${repair.id}" title="In phiếu">🖨️</button>
-                    <button type="button" class="btn-secondary mini-btn btn-action-invoice" data-id="${repair.id}" title="Hóa đơn">🧾</button>
+                    <select class="status-select" data-status-id="${repair.id}">
+                        <option value="Chưa xử lý" ${repair.tinhTrang === 'Chưa xử lý' ? 'selected' : ''}>Chưa xử lý</option>
+                        <option value="Đang xử lý" ${repair.tinhTrang === 'Đang xử lý' ? 'selected' : ''}>Đang xử lý</option>
+                        <option value="Đã xử lý" ${repair.tinhTrang === 'Đã xử lý' ? 'selected' : ''}>Đã xử lý</option>
+                        <option value="Đã trả máy" ${repair.tinhTrang === 'Đã trả máy' ? 'selected' : ''}>Đã trả máy</option>
+                    </select>
                 </td>
+                <td>${repair.ngayTra || '-'}</td>
             </tr>
             ${isExpanded ? `
             <tr class="repair-detail-row">
-                <td colspan="9">
+                <td colspan="8">
                     <div class="repair-detail-box">
                         <div class="repair-detail-grid">
                             <div><strong>Mô tả lỗi:</strong> ${repair.moTaLoi || '-'}</div>
@@ -243,7 +400,11 @@ class RepairManager {
                         <div class="work-note-block">
                             <label for="workNote-${repair.id}"><strong>Ghi chú sửa chữa (nội bộ):</strong></label>
                             <textarea id="workNote-${repair.id}" rows="3" placeholder="Nhập ghi chú quá trình sửa...">${repair.workNote || ''}</textarea>
-                            <button type="button" class="btn-primary mini-btn" data-save-note="${repair.id}">💾 Lưu ghi chú sửa chữa</button>
+                            <div class="detail-actions-row">
+                                <button type="button" class="btn-print btn-action-print" data-id="${repair.id}" title="In phiếu">🖨️ In phiếu</button>
+                                <button type="button" class="btn-secondary btn-action-invoice" data-id="${repair.id}" title="Hóa đơn">🧾 In hóa đơn</button>
+                                <button type="button" class="btn-primary" data-save-note="${repair.id}">💾 Lưu ghi chú sửa chữa</button>
+                            </div>
                         </div>
                     </div>
                 </td>
@@ -283,6 +444,64 @@ class RepairManager {
                 this.saveRepairWorkNote(id);
             });
         });
+
+        tbody.querySelectorAll('.status-select').forEach((selectEl) => {
+            selectEl.addEventListener('click', (e) => e.stopPropagation());
+            selectEl.addEventListener('change', async (e) => {
+                const id = Number(selectEl.dataset.statusId);
+                const newStatus = e.target.value;
+                await this.updateRepairStatus(id, newStatus);
+            });
+        });
+    }
+
+    async updateRepairStatus(id, newStatus) {
+        const repair = this.repairs.find(r => r.id === id);
+        if (!repair) return;
+
+        const oldStatus = repair.tinhTrang;
+        const oldNgayTra = repair.ngayTra;
+        const nextNgayTra = newStatus === 'Đã trả máy' ? this.formatDateVN(new Date()) : null;
+
+        repair.tinhTrang = newStatus;
+        repair.ngayTra = nextNgayTra;
+
+        try {
+            if (this.isLocalMode) {
+                this.saveLocalRepairs(this.repairs);
+            } else {
+                const res = await fetch(`/api/repairs/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tinhTrang: newStatus,
+                        ngayTra: nextNgayTra
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || `HTTP ${res.status}`);
+                }
+
+                const updated = await res.json();
+                const idx = this.repairs.findIndex(r => r.id === id);
+                if (idx >= 0) {
+                    this.repairs[idx] = this.normalizeRepair(updated, id);
+                }
+            }
+
+            this.renderTable();
+            this.renderSummaryCards();
+            this.showNotification('✅ Đã cập nhật tình trạng');
+            await this.backupToDrive(repair);
+        } catch (error) {
+            repair.tinhTrang = oldStatus;
+            repair.ngayTra = oldNgayTra;
+            this.renderTable();
+            this.renderSummaryCards();
+            this.showNotification(`❌ Lỗi cập nhật tình trạng: ${error.message}`, 'error');
+        }
     }
 
     toggleRepairDetails(id) {
@@ -307,13 +526,38 @@ class RepairManager {
         }, 1200);
     }
 
-    saveRepairWorkNote(id) {
+    async saveRepairWorkNote(id) {
         const repair = this.repairs.find(r => r.id === id);
         if (!repair) return;
         const el = document.getElementById(`workNote-${id}`);
         if (!el) return;
         repair.workNote = (el.value || '').trim();
+
+        if (this.isLocalMode) {
+            this.saveLocalRepairs(this.repairs);
+        }
+
         this.showNotification('✅ Đã lưu ghi chú sửa chữa');
+        await this.backupToDrive(repair);
+    }
+
+    async backupToDrive(repairData) {
+        try {
+            await fetch(this.BACKUP_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    source: this.isLocalMode ? 'local' : 'live',
+                    timestamp: new Date().toISOString(),
+                    data: repairData
+                })
+            });
+        } catch (error) {
+            console.error('backupToDrive error:', error);
+        }
     }
 
     printTicket(id) {
@@ -327,7 +571,7 @@ class RepairManager {
         if (!repair) return;
 
         document.getElementById('invoiceRepairId').value = id;
-        document.getElementById('invoiceDiscount').value = repair.invoice?.discount || 0;
+        document.getElementById('invoiceDiscount').value = this.formatThousands(repair.invoice?.discount || 0);
         document.getElementById('invoiceDevice').value = repair.invoice?.device || repair.tenMay || '';
         document.getElementById('invoiceService').value = '';
         document.getElementById('invoiceQty').value = 1;
@@ -344,7 +588,7 @@ class RepairManager {
         const service = (document.getElementById('invoiceService')?.value || '').trim();
         const device = (document.getElementById('invoiceDevice')?.value || '').trim();
         const qty = Number(document.getElementById('invoiceQty')?.value || 1);
-        const amount = Number(document.getElementById('invoiceAmount')?.value || 0);
+        const amount = this.parseFormattedNumber(document.getElementById('invoiceAmount')?.value || '0');
 
         if (!service || !device || qty <= 0 || amount < 0) {
             this.showNotification('❌ Vui lòng nhập đúng dữ liệu dịch vụ', 'error');
@@ -409,8 +653,8 @@ class RepairManager {
 
     calculateInvoiceTotal() {
         const subtotal = this.currentInvoiceServices.reduce((sum, r) => sum + (Number(r.qty) * Number(r.amount)), 0);
-        const discount = Number(document.getElementById('invoiceDiscount')?.value || 0);
-        document.getElementById('invoiceTotal').value = Math.max(0, subtotal - discount);
+        const discount = this.parseFormattedNumber(document.getElementById('invoiceDiscount')?.value || '0');
+        document.getElementById('invoiceTotal').value = this.formatThousands(Math.max(0, subtotal - discount));
     }
 
     saveInvoiceAndPrint() {
@@ -419,7 +663,7 @@ class RepairManager {
         if (!repair) return;
 
         const device = (document.getElementById('invoiceDevice')?.value || '').trim();
-        const discount = Number(document.getElementById('invoiceDiscount')?.value || 0);
+        const discount = this.parseFormattedNumber(document.getElementById('invoiceDiscount')?.value || '0');
         const services = [...this.currentInvoiceServices];
 
         if (!device || !services.length || discount < 0) {
@@ -588,6 +832,22 @@ class RepairManager {
 
     formatDateVN(dateObj) {
         return new Date(dateObj).toLocaleDateString('vi-VN');
+    }
+
+    parseFormattedNumber(value) {
+        const raw = String(value || '').replace(/[^\d]/g, '');
+        return raw ? Number(raw) : 0;
+    }
+
+    formatThousands(value) {
+        const num = Number(value) || 0;
+        return num.toLocaleString('en-US');
+    }
+
+    formatCurrencyInput(inputEl) {
+        if (!inputEl) return;
+        const parsed = this.parseFormattedNumber(inputEl.value);
+        inputEl.value = this.formatThousands(parsed);
     }
 
     showNotification(message, type = 'success') {

@@ -152,6 +152,52 @@ app.post('/api/repairs', async (req, res) => {
     }
 });
 
+app.put('/api/repairs/:id/status', async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const tinhTrang = String(req.body?.tinhTrang || '').trim();
+        const ngayTra = req.body?.ngayTra ?? null;
+
+        if (!id || Number.isNaN(id)) {
+            return res.status(400).json({ message: 'ID không hợp lệ' });
+        }
+
+        const allowed = ['Chưa xử lý', 'Đang xử lý', 'Đã xử lý', 'Đã trả máy'];
+        if (!allowed.includes(tinhTrang)) {
+            return res.status(400).json({ message: 'Tình trạng không hợp lệ' });
+        }
+
+        await pool.query(
+            `
+            UPDATE repairs
+            SET tinhTrang = ?, ngayTra = ?
+            WHERE id = ?
+            `,
+            [tinhTrang, ngayTra, id]
+        );
+
+        const [rows] = await pool.query(
+            `
+            SELECT
+                id, ngayNhan, tenKhach, sdt, tenMay, moTaLoi,
+                phuongAnXuLi, tinhTrang, ngayTra, ghiChu, workNote
+            FROM repairs
+            WHERE id = ?
+            `,
+            [id]
+        );
+
+        if (!rows.length) {
+            return res.status(404).json({ message: 'Không tìm thấy phiếu sửa chữa' });
+        }
+
+        return res.json(rows[0]);
+    } catch (error) {
+        console.error('PUT /api/repairs/:id/status error:', error);
+        return res.status(500).json({ message: 'Lỗi cập nhật tình trạng', error: error.message });
+    }
+});
+
 initDatabase()
     .then(() => {
         app.listen(PORT, () => {

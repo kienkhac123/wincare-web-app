@@ -67,7 +67,6 @@
                             <th>Ghi chú</th>
                             <th>Tình trạng</th>
                             <th>Ngày trả</th>
-                            <th>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="repairList"></tbody>
@@ -98,7 +97,7 @@
                             <label>Tên máy <span class="required">*</span></label>
                             <input type="text" id="tenMay" required>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group full-width">
                             <label>Mô tả lỗi <span class="required">*</span></label>
                             <textarea id="moTaLoi" required rows="3"></textarea>
                         </div>
@@ -150,7 +149,7 @@
                         </div>
                         <div class="form-group">
                             <label>Thành tiền</label>
-                            <input type="number" id="invoiceAmount" min="0">
+                            <input type="text" id="invoiceAmount" inputmode="numeric" placeholder="0">
                         </div>
                         <div class="form-group">
                             <label>&nbsp;</label>
@@ -163,11 +162,11 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label>Chiết khấu</label>
-                            <input type="number" id="invoiceDiscount" min="0" value="0">
+                            <input type="text" id="invoiceDiscount" inputmode="numeric" value="0">
                         </div>
                         <div class="form-group">
                             <label>Tổng tiền</label>
-                            <input type="number" id="invoiceTotal" readonly>
+                            <input type="text" id="invoiceTotal" readonly>
                         </div>
                     </div>
 
