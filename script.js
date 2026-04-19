@@ -465,8 +465,8 @@ class RepairManager {
             </table>
 
             <div class="invoice-note">
-                <strong>LƯU Ý QUAN TRỌNG:</strong>
-                Quý khách vui lòng ký tên linh kiện hoặc chụp ảnh linh kiện ngay trước khi bàn giao máy.
+                <strong>LƯU Ý QUAN TRỌNG:</strong><br>
+                Quý khách vui lòng ký tên linh kiện hoặc chụp ảnh linh kiện ngay trước khi bàn giao máy.<br>
                 Cửa hàng sẽ bàn giao máy dựa trên đối chiếu ký hiệu linh kiện hoặc ảnh đã lưu.
             </div>
 
