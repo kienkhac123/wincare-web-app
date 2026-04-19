@@ -496,11 +496,19 @@ tr:hover {
 }
 
 .invoice-note {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #000 !important;
     margin: 8px 0;
-    border: 1px solid #000;
-    padding: 6px;
+    margin-top: 20px;
+    border: 1px dashed #000;
+    padding: 10px;
     font-size: 12px;
     font-weight: 600;
+    clear: both;
+    page-break-inside: avoid;
+    break-inside: avoid;
 }
 
 .invoice-summary {
@@ -603,6 +611,19 @@ tr:hover {
 
     #printContent, #printContent * {
         visibility: visible !important;
+    }
+
+    .invoice-note {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        color: #000 !important;
+        border: 1px dashed #000 !important;
+        padding: 10px !important;
+        margin-top: 20px !important;
+        clear: both !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
     }
 
     #printModal {
