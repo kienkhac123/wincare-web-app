@@ -410,6 +410,25 @@ class RepairManager {
         const printContent = document.getElementById('printContent');
         if (!printContent || !repair) return;
         printContent.innerHTML = this.generatePrintHTML(repair, isInvoice);
+
+        // Fallback cưỡng bức: luôn đảm bảo có khối lưu ý quan trọng trong DOM thực tế
+        if (!printContent.querySelector('.invoice-note')) {
+            const statusBlock = printContent.querySelector('.invoice-status');
+            const fallbackNote = document.createElement('div');
+            fallbackNote.className = 'invoice-note';
+            fallbackNote.innerHTML = `
+                <strong>LƯU Ý QUAN TRỌNG:</strong><br>
+                Quý khách vui lòng ký tên linh kiện hoặc chụp ảnh linh kiện ngay trước khi bàn giao máy.<br>
+                Cửa hàng sẽ bàn giao máy dựa trên đối chiếu ký hiệu linh kiện hoặc ảnh đã lưu.
+            `;
+
+            if (statusBlock && statusBlock.parentNode) {
+                statusBlock.parentNode.insertBefore(fallbackNote, statusBlock);
+            } else {
+                printContent.appendChild(fallbackNote);
+            }
+        }
+
         this.openModal('printModal');
     }
 
