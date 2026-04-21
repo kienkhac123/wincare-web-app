@@ -1,25 +1,32 @@
-# TODO - Wincare24 UI + API Integration
+# TODO - Rebuild Backend `server.js` (MySQL, Secure, Scalable)
 
-## Approved Plan
-- [x] Read old files from `../Wincare24`.
-- [x] Confirm integration plan with user.
+## ✅ Plan Approved
+- [x] Keep frontend untouched (`index.html`, `style.css`, `script.js` behavior compatibility).
+- [x] Rebuild backend with Node.js + Express + MySQL.
+- [x] Bind server to IPv4 host `0.0.0.0`.
 
-## Implementation Steps
-- [ ] Replace `index.html` in current project with old `wincare24/index.html` (keep UI 100%).
-- [ ] Update `script.js`:
-  - [ ] Replace localStorage init with `fetch('/api/repairs')`.
-  - [ ] Map API fields to UI fields:
-    - [ ] `customer -> tenKhach`
-    - [ ] `device -> tenMay`
-    - [ ] `status -> tinhTrang`
-    - [ ] `note -> ghiChu`
-  - [ ] Keep search/filter/expand/print/modal features.
-  - [ ] Keep create form submit but POST to `/api/repairs`.
-  - [ ] Refetch list after successful POST.
-- [ ] Keep `style.css` unchanged.
-- [ ] Final review.
+## 🔧 Implementation Steps
+- [x] Rewrite `server.js` from scratch with:
+  - [x] Express app bootstrap
+  - [x] Security middleware (`helmet`, strict `cors`, JSON parser limit)
+  - [x] MySQL pool config with UTF-8 (`utf8mb4`)
+  - [x] DB initialization + table create (`repairs`)
+  - [x] Validation/sanitization helpers
+  - [x] API routes:
+    - [x] `GET /api/repairs` (supports optional q/status/limit/offset)
+    - [x] `POST /api/repairs`
+    - [x] `PUT /api/repairs/:id/status`
+  - [x] `GET /api/health`
+  - [x] 404 + centralized error middleware
+  - [x] `app.listen(PORT, '0.0.0.0', ...)`
+- [x] Update `package.json` dependencies (add `helmet`).
 
-## Testing (pending user preference)
-- [ ] API GET `/api/repairs` response shape check.
-- [ ] Create form POST and table refresh.
-- [ ] Search + filter + responsive.
+## 🧪 Testing Steps
+- [ ] Install/update dependencies.
+- [ ] Start server.
+- [ ] Curl test:
+  - [ ] Health endpoint
+  - [ ] GET repairs
+  - [ ] POST repairs (Vietnamese payload)
+  - [ ] PUT status update
+- [ ] Verify no regression with frontend API contract.
