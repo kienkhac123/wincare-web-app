@@ -310,7 +310,8 @@ class RepairManager {
             document.getElementById('repairForm')?.reset();
             this.closeModal('createModal');
             this.showNotification('✅ Tạo phiếu thành công');
-            await this.backupToDrive(saved);
+            this.printTicket(saved.id);
+            this.backupToDrive(saved);
         } catch (error) {
             console.error('submitForm error:', error);
             this.showNotification(`❌ Lỗi lưu dữ liệu: ${error.message}`, 'error');
