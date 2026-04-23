@@ -162,8 +162,8 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 
 // Static frontend
-const publicDir = path.join(__dirname, 'public');
-app.use(express.static(publicDir));
+//const publicDir = path.join(__dirname, 'public');
+//app.use(express.static(publicDir));
 app.use(express.static(__dirname));
 
 /**
