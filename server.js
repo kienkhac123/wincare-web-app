@@ -6,15 +6,7 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 
 const app = express();
-const cors = require('cors');
 
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type']
-}));
-
-app.options('*', cors());
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 
@@ -150,7 +142,15 @@ function asyncHandler(fn) {
  */
 app.use(helmet());
 
+const cors = require('cors');
 
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+}));
+
+app.options('*', cors());
 app.use(express.json({ limit: '1mb' }));
 
 // Static frontend
