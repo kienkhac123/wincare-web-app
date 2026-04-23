@@ -230,7 +230,7 @@ class RepairManager {
 
     async fetchRepairs() {
         try {
-            const data = await this.apiRequest('${API_BASE}/api/repairs', 'GET');
+            const data = await this.apiRequest(`${API_BASE}/api/repairs`, 'GET');
             this.repairs = Array.isArray(data)
                 ? data.map((r, idx) => this.normalizeRepair(r, idx + 1))
                 : [];
@@ -292,7 +292,7 @@ class RepairManager {
 
             let saved;
             try {
-                const created = await this.apiRequest('${API_BASE}/api/repairs', 'POST', payload);
+                const created = await this.apiRequest(`${API_BASE}/api/repairs`, 'POST', payload);
                 saved = this.normalizeRepair(created, Number(created?.id) || this.getNextLocalId(this.repairs));
             } catch (apiError) {
                 console.error('submitForm API error:', apiError);
