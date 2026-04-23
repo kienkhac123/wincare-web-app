@@ -142,7 +142,6 @@ function asyncHandler(fn) {
  */
 app.use(helmet());
 
-const cors = require('cors');
 
 app.use(cors({
     origin: '*',
