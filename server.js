@@ -140,7 +140,20 @@ function asyncHandler(fn) {
 /**
  * Security / middleware
  */
-app.use(helmet());
+const defaultCspDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
+
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            ...defaultCspDirectives,
+            'connect-src': [
+                "'self'",
+                'https://script.google.com',
+                'https://script.googleusercontent.com'
+            ]
+        }
+    }
+}));
 
 
 app.use(cors({
