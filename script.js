@@ -157,6 +157,7 @@ class RepairManager {
 
         document.getElementById('closePrintIcon')?.addEventListener('click', () => this.closeModal('printModal'));
         document.getElementById('closePrint')?.addEventListener('click', () => this.closeModal('printModal'));
+        document.getElementById('confirmPrint')?.addEventListener('click', () => this.printCurrentDocument());
 
         document.getElementById('searchInput')?.addEventListener('input', (e) => {
             this.searchKeyword = (e.target.value || '').trim().toLowerCase();
@@ -664,6 +665,73 @@ class RepairManager {
         }
 
         this.openModal('printModal');
+    }
+
+    printCurrentDocument() {
+        const printContent = document.getElementById('printContent');
+        if (!printContent || !printContent.innerHTML.trim()) {
+            this.showNotification('❌ Không có nội dung để in', 'error');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) {
+            this.showNotification('❌ Trình duyệt đang chặn cửa sổ in', 'error');
+            return;
+        }
+
+        const title = 'In phiếu sửa chữa';
+        const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+
+        .print-shell {
+            width: 100%;
+            max-width: 80mm;
+            margin: 0 auto;
+            background: #fff;
+        }
+
+        @media screen {
+            body {
+                padding: 12px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-shell">${printContent.innerHTML}</div>
+</body>
+</html>`;
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+
+        const triggerPrint = () => {
+            printWindow.focus();
+            printWindow.print();
+        };
+
+        if (printWindow.document.readyState === 'complete') {
+            setTimeout(triggerPrint, 150);
+            return;
+        }
+
+        printWindow.addEventListener('load', () => {
+            setTimeout(triggerPrint, 150);
+        }, { once: true });
     }
 
     generatePrintHTML(repair, isInvoice = false) {
