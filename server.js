@@ -6,7 +6,15 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 
 const app = express();
+const cors = require('cors');
 
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+}));
+
+app.options('*', cors());
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 
@@ -142,22 +150,6 @@ function asyncHandler(fn) {
  */
 app.use(helmet());
 
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow same-origin/non-browser tools (curl/postman/no-origin)
-        if (!origin) return callback(null, true);
-
-        const allowed = (process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
-        if (!allowed.length || allowed.includes(origin)) {
-            return callback(null, true);
-        }
-
-        return callback(new Error('CORS blocked for this origin'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false
-}));
 
 app.use(express.json({ limit: '1mb' }));
 
