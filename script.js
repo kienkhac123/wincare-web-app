@@ -450,6 +450,7 @@ class RepairManager {
 
         try {
             await this.apiRequest(`${this.API_BASE}/api/repairs/${id}/status`, 'PUT', {
+                tinhTrang: newStatus,
                 ngayTra: nextNgayTra
             });
 
