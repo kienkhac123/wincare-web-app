@@ -674,12 +674,6 @@ class RepairManager {
             return;
         }
 
-        const printWindow = window.open('', '_blank', 'width=900,height=700');
-        if (!printWindow) {
-            this.showNotification('❌ Trình duyệt đang chặn cửa sổ in', 'error');
-            return;
-        }
-
         const title = 'In phiếu sửa chữa';
         const html = `
 <!DOCTYPE html>
@@ -715,21 +709,53 @@ class RepairManager {
 </body>
 </html>`;
 
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
+        const existingFrame = document.getElementById('printFrame');
+        if (existingFrame) existingFrame.remove();
 
-        const triggerPrint = () => {
-            printWindow.focus();
-            printWindow.print();
+        const iframe = document.createElement('iframe');
+        iframe.id = 'printFrame';
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0';
+        iframe.style.pointerEvents = 'none';
+        document.body.appendChild(iframe);
+
+        const cleanup = () => {
+            setTimeout(() => {
+                iframe.remove();
+            }, 100);
         };
 
-        if (printWindow.document.readyState === 'complete') {
+        const frameWindow = iframe.contentWindow;
+        if (!frameWindow) {
+            cleanup();
+            this.showNotification('❌ Không khởi tạo được vùng in', 'error');
+            return;
+        }
+
+        frameWindow.document.open();
+        frameWindow.document.write(html);
+        frameWindow.document.close();
+
+        const triggerPrint = () => {
+            frameWindow.focus();
+            frameWindow.print();
+        };
+
+        frameWindow.addEventListener('afterprint', cleanup, { once: true });
+        setTimeout(cleanup, 60000);
+
+        if (frameWindow.document.readyState === 'complete') {
             setTimeout(triggerPrint, 150);
             return;
         }
 
-        printWindow.addEventListener('load', () => {
+        iframe.addEventListener('load', () => {
             setTimeout(triggerPrint, 150);
         }, { once: true });
     }
