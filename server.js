@@ -316,6 +316,31 @@ app.put('/api/repairs/:id/status', asyncHandler(async (req, res) => {
     return res.json(rows[0]);
 }));
 
+app.delete('/api/repairs', asyncHandler(async (req, res) => {
+    const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const ids = rawIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (!ids.length) {
+        return res.status(400).json({ message: 'Danh sách ID không hợp lệ' });
+    }
+
+    const uniqueIds = [...new Set(ids)];
+    const placeholders = uniqueIds.map(() => '?').join(', ');
+
+    const [result] = await pool.query(
+        `DELETE FROM repairs WHERE id IN (${placeholders})`,
+        uniqueIds
+    );
+
+    console.log(`[API] DELETE /api/repairs -> deleted=${result.affectedRows}, ids=${uniqueIds.join(',')}`);
+    return res.json({
+        deletedCount: result.affectedRows,
+        ids: uniqueIds
+    });
+}));
+
 /**
  * Not Found
  */

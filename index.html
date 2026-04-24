@@ -35,7 +35,7 @@
             <h2>📋 Danh sách máy đang sửa</h2>
 
             <div class="filter-bar">
-                <div class="filter-item search-item">
+                <div class="filter-item search-item" id="searchFilterItem">
                     <label for="searchInput">Tìm kiếm</label>
                     <input
                         type="text"
@@ -53,12 +53,66 @@
                         <option value="Đã trả máy">Đã trả máy</option>
                     </select>
                 </div>
+                <div class="filter-item selection-toggle-item">
+                    <label>&nbsp;</label>
+                    <button type="button" id="toggleSelectMode" class="btn-secondary">Chá»n</button>
+                </div>
+                <div id="batchSelectPanel" class="batch-select-panel hidden">
+                    <div class="batch-select-head">
+                        <div>
+                            <strong>Báº£ng chá»n</strong>
+                            <span id="selectedCountText">ChÆ°a chá»n phiáº¿u nÃ o</span>
+                        </div>
+                        <button type="button" id="deleteSelectedBtn" class="btn-danger" disabled>XÃ³a Ä‘Ã£ chá»n</button>
+                    </div>
+                    <div class="batch-select-grid">
+                        <div class="batch-filter-group">
+                            <label>Kiá»ƒu thá»i gian</label>
+                            <div class="batch-filter-type">
+                                <label class="radio-chip">
+                                    <input type="radio" name="selectionTimeMode" value="preset" checked>
+                                    <span>Khung sáºµn</span>
+                                </label>
+                                <label class="radio-chip">
+                                    <input type="radio" name="selectionTimeMode" value="custom">
+                                    <span>TÃ¹y chá»n ngÃ y</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="batch-filter-group" id="presetFilterGroup">
+                            <label for="timePresetFilter">Chá»n khung thá»i gian</label>
+                            <select id="timePresetFilter">
+                                <option value="all">ToÃ n thá»i gian</option>
+                                <option value="today">HÃ´m nay</option>
+                                <option value="yesterday">HÃ´m qua</option>
+                                <option value="thisWeek">Tuáº§n nÃ y</option>
+                                <option value="lastWeek">Tuáº§n trÆ°á»›c</option>
+                                <option value="last7days">7 ngÃ y qua</option>
+                                <option value="thisMonth">ThÃ¡ng nÃ y</option>
+                                <option value="lastMonth">ThÃ¡ng trÆ°á»›c</option>
+                                <option value="last30days">30 ngÃ y qua</option>
+                                <option value="thisYear">NÄƒm nÃ y</option>
+                                <option value="lastYear">NÄƒm trÆ°á»›c</option>
+                            </select>
+                        </div>
+                        <div class="batch-filter-group hidden" id="customDateGroup">
+                            <label>Khoáº£ng ngÃ y cá»¥ thá»ƒ</label>
+                            <div class="custom-date-grid">
+                                <input type="date" id="customDateFrom">
+                                <input type="date" id="customDateTo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="table-container">
                 <table id="repairTable">
                     <thead>
                         <tr>
+                            <th id="selectColumnHead" class="hidden">
+                                <input type="checkbox" id="selectAllRepairs" aria-label="Chá»n táº¥t cáº£">
+                            </th>
                             <th>ID</th>
                             <th>Ngày nhận</th>
                             <th>Khách hàng</th>

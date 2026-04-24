@@ -6,6 +6,12 @@ class RepairManager {
         this.searchKeyword = '';
         this.statusFilter = 'all';
         this.expandedRepairId = null;
+        this.selectionMode = false;
+        this.selectedRepairIds = new Set();
+        this.selectionTimeMode = 'preset';
+        this.selectionTimePreset = 'all';
+        this.selectionDateFrom = '';
+        this.selectionDateTo = '';
         this.currentInvoiceServices = [];
         this.STORAGE_KEY = 'wincare_repairs';
         this.BACKUP_URL = 'https://script.google.com/macros/s/AKfycbwbBLpp8ydoZ42e3Ivv6pevuUX6d8uVI478NE511oVkJHIyBExD34Q1Ct13IVFAKJSz/exec';
@@ -148,7 +154,9 @@ class RepairManager {
         document.getElementById('invoiceDiscount')?.addEventListener('input', (e) => {
             this.formatCurrencyInput(e.target);
             this.calculateInvoiceTotal();
+            this.persistCurrentInvoiceDraft();
         });
+        document.getElementById('invoiceDevice')?.addEventListener('input', () => this.persistCurrentInvoiceDraft());
         document.getElementById('invoiceAmount')?.addEventListener('input', (e) => {
             this.formatCurrencyInput(e.target);
         });
@@ -165,6 +173,34 @@ class RepairManager {
         });
         document.getElementById('statusFilter')?.addEventListener('change', (e) => {
             this.statusFilter = e.target.value || 'all';
+            this.renderTable();
+        });
+        document.getElementById('toggleSelectMode')?.addEventListener('click', () => {
+            this.toggleSelectionMode();
+        });
+        document.getElementById('deleteSelectedBtn')?.addEventListener('click', async () => {
+            await this.deleteSelectedRepairs();
+        });
+        document.getElementById('selectAllRepairs')?.addEventListener('change', (e) => {
+            this.toggleSelectAllFiltered(e.target.checked);
+        });
+        document.querySelectorAll('input[name="selectionTimeMode"]').forEach((radio) => {
+            radio.addEventListener('change', (e) => {
+                this.selectionTimeMode = e.target.value || 'preset';
+                this.renderSelectionPanel();
+                this.renderTable();
+            });
+        });
+        document.getElementById('timePresetFilter')?.addEventListener('change', (e) => {
+            this.selectionTimePreset = e.target.value || 'all';
+            this.renderTable();
+        });
+        document.getElementById('customDateFrom')?.addEventListener('change', (e) => {
+            this.selectionDateFrom = e.target.value || '';
+            this.renderTable();
+        });
+        document.getElementById('customDateTo')?.addEventListener('change', (e) => {
+            this.selectionDateTo = e.target.value || '';
             this.renderTable();
         });
 
@@ -225,15 +261,23 @@ class RepairManager {
             ngayTra: row?.ngayTra || null,
             ghiChu: row?.ghiChu || '',
             workNote: row?.workNote || '',
-            invoice: row?.invoice || null
+            invoice: row?.invoice || null,
+            invoiceDraft: row?.invoiceDraft || null
         };
     }
 
     async fetchRepairs() {
         try {
+            const localById = new Map(this.getLocalRepairs().map((r) => [Number(r?.id), r]));
             const data = await this.apiRequest(`${this.API_BASE}/api/repairs`, 'GET');
             this.repairs = Array.isArray(data)
-                ? data.map((r, idx) => this.normalizeRepair(r, idx + 1))
+                ? data.map((r, idx) => {
+                    const normalized = this.normalizeRepair(r, idx + 1);
+                    const local = localById.get(Number(normalized.id));
+                    if (local?.invoice) normalized.invoice = local.invoice;
+                    if (local?.invoiceDraft) normalized.invoiceDraft = local.invoiceDraft;
+                    return normalized;
+                })
                 : [];
             this.saveLocalRepairs(this.repairs);
         } catch (error) {
@@ -321,6 +365,192 @@ class RepairManager {
         }
     }
 
+    toggleSelectionMode() {
+        this.selectionMode = !this.selectionMode;
+        this.selectedRepairIds.clear();
+        this.expandedRepairId = null;
+        if (this.selectionMode) {
+            this.searchKeyword = '';
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.value = '';
+        }
+        this.renderSelectionPanel();
+        this.fixSelectionPanelText();
+        this.renderTable();
+    }
+
+    fixSelectionPanelText() {
+        const panel = document.getElementById('batchSelectPanel');
+        const toggleBtn = document.getElementById('toggleSelectMode');
+        const deleteBtn = document.getElementById('deleteSelectedBtn');
+        const selectedCountText = document.getElementById('selectedCountText');
+        const selectAll = document.getElementById('selectAllRepairs');
+        const presetSelect = document.getElementById('timePresetFilter');
+
+        panel?.querySelector('.batch-select-head strong')?.replaceChildren(document.createTextNode('Bảng chọn'));
+        if (toggleBtn) toggleBtn.textContent = this.selectionMode ? 'Hủy chọn' : 'Chọn';
+        if (deleteBtn) deleteBtn.textContent = 'Xóa đã chọn';
+        if (selectedCountText) {
+            selectedCountText.textContent = this.selectedRepairIds.size
+                ? `Đã chọn ${this.selectedRepairIds.size} phiếu`
+                : 'Chưa chọn phiếu nào';
+        }
+        if (selectAll) selectAll.setAttribute('aria-label', 'Chọn tất cả');
+
+        const labels = panel?.querySelectorAll('.batch-filter-group > label');
+        if (labels?.[0]) labels[0].textContent = 'Kiểu thời gian';
+        if (labels?.[1]) labels[1].textContent = 'Chọn khung thời gian';
+        if (labels?.[2]) labels[2].textContent = 'Khoảng ngày cụ thể';
+
+        const radioSpans = panel?.querySelectorAll('.radio-chip span');
+        if (radioSpans?.[0]) radioSpans[0].textContent = 'Khung sẵn';
+        if (radioSpans?.[1]) radioSpans[1].textContent = 'Tùy chọn ngày';
+
+        if (presetSelect) {
+            const texts = {
+                all: 'Toàn thời gian',
+                today: 'Hôm nay',
+                yesterday: 'Hôm qua',
+                thisWeek: 'Tuần này',
+                lastWeek: 'Tuần trước',
+                last7days: '7 ngày qua',
+                thisMonth: 'Tháng này',
+                lastMonth: 'Tháng trước',
+                last30days: '30 ngày qua',
+                thisYear: 'Năm nay',
+                lastYear: 'Năm trước'
+            };
+            [...presetSelect.options].forEach((option) => {
+                option.textContent = texts[option.value] || option.textContent;
+            });
+        }
+    }
+
+    renderSelectionPanel() {
+        const searchItem = document.getElementById('searchFilterItem');
+        const panel = document.getElementById('batchSelectPanel');
+        const toggleBtn = document.getElementById('toggleSelectMode');
+        const deleteBtn = document.getElementById('deleteSelectedBtn');
+        const selectedCountText = document.getElementById('selectedCountText');
+        const selectHead = document.getElementById('selectColumnHead');
+        const presetGroup = document.getElementById('presetFilterGroup');
+        const customGroup = document.getElementById('customDateGroup');
+        const selectAll = document.getElementById('selectAllRepairs');
+        const presetSelect = document.getElementById('timePresetFilter');
+        const dateFrom = document.getElementById('customDateFrom');
+        const dateTo = document.getElementById('customDateTo');
+
+        if (searchItem) searchItem.classList.toggle('hidden', this.selectionMode);
+        if (panel) panel.classList.toggle('hidden', !this.selectionMode);
+        if (toggleBtn) {
+            toggleBtn.textContent = this.selectionMode ? 'Há»§y chá»n' : 'Chá»n';
+            toggleBtn.className = this.selectionMode ? 'btn-danger' : 'btn-secondary';
+        }
+        if (deleteBtn) deleteBtn.disabled = this.selectedRepairIds.size === 0;
+        if (selectedCountText) {
+            selectedCountText.textContent = this.selectedRepairIds.size
+                ? `ÄÃ£ chá»n ${this.selectedRepairIds.size} phiáº¿u`
+                : 'ChÆ°a chá»n phiáº¿u nÃ o';
+        }
+        if (selectHead) selectHead.classList.toggle('hidden', !this.selectionMode);
+        if (presetGroup) presetGroup.classList.toggle('hidden', this.selectionTimeMode !== 'preset');
+        if (customGroup) customGroup.classList.toggle('hidden', this.selectionTimeMode !== 'custom');
+        if (presetSelect) presetSelect.value = this.selectionTimePreset;
+        if (dateFrom) dateFrom.value = this.selectionDateFrom;
+        if (dateTo) dateTo.value = this.selectionDateTo;
+        if (selectAll) {
+            const filtered = this.getFilteredRepairs();
+            selectAll.checked = filtered.length > 0 && filtered.every((repair) => this.selectedRepairIds.has(repair.id));
+        }
+        this.fixSelectionPanelText();
+    }
+
+    toInputDateValue(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    getDateRangeForSelectionFilter() {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (this.selectionTimeMode === 'custom') {
+            const from = this.selectionDateFrom ? new Date(`${this.selectionDateFrom}T00:00:00`) : null;
+            const to = this.selectionDateTo ? new Date(`${this.selectionDateTo}T23:59:59`) : null;
+            return { from, to };
+        }
+
+        switch (this.selectionTimePreset) {
+        case 'today':
+            return { from: today, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+        case 'yesterday': {
+            const from = new Date(today);
+            from.setDate(from.getDate() - 1);
+            return { from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate(), 23, 59, 59) };
+        }
+        case 'thisWeek': {
+            const day = today.getDay() || 7;
+            const from = new Date(today);
+            from.setDate(today.getDate() - day + 1);
+            return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+        }
+        case 'lastWeek': {
+            const day = today.getDay() || 7;
+            const end = new Date(today);
+            end.setDate(today.getDate() - day);
+            const from = new Date(end);
+            from.setDate(end.getDate() - 6);
+            return { from, to: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59) };
+        }
+        case 'last7days': {
+            const from = new Date(today);
+            from.setDate(today.getDate() - 6);
+            return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+        }
+        case 'thisMonth':
+            return {
+                from: new Date(today.getFullYear(), today.getMonth(), 1),
+                to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+            };
+        case 'lastMonth': {
+            const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const to = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+            return { from, to };
+        }
+        case 'last30days': {
+            const from = new Date(today);
+            from.setDate(today.getDate() - 29);
+            return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+        }
+        case 'thisYear':
+            return {
+                from: new Date(today.getFullYear(), 0, 1),
+                to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+            };
+        case 'lastYear':
+            return {
+                from: new Date(today.getFullYear() - 1, 0, 1),
+                to: new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59)
+            };
+        default:
+            return { from: null, to: null };
+        }
+    }
+
+    matchesSelectionDateFilter(repair) {
+        if (!this.selectionMode) return true;
+
+        const repairDate = this.parseViDate(repair.ngayNhan);
+        if (!repairDate) return false;
+
+        const { from, to } = this.getDateRangeForSelectionFilter();
+        if (from && repairDate < from) return false;
+        if (to && repairDate > to) return false;
+        return true;
+    }
+
     getFilteredRepairs() {
         const keyword = this.searchKeyword;
         const status = this.statusFilter;
@@ -330,7 +560,8 @@ class RepairManager {
                 || (r.sdt || '').toLowerCase().includes(keyword)
                 || (r.tenMay || '').toLowerCase().includes(keyword);
             const matchStatus = status === 'all' || r.tinhTrang === status;
-            return matchKeyword && matchStatus;
+            const matchDate = this.matchesSelectionDateFilter(r);
+            return matchKeyword && matchStatus && matchDate;
         });
     }
 
@@ -339,7 +570,15 @@ class RepairManager {
         if (!tbody) return;
 
         const list = this.getFilteredRepairs();
+        const colspan = this.selectionMode ? 9 : 8;
         tbody.innerHTML = '';
+
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:24px;color:#7f8c8d;">Không có dữ liệu</td></tr>`;
+            this.renderSelectionPanel();
+            this.fixSelectionPanelText();
+            return;
+        }
 
         if (!list.length) {
             tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#7f8c8d;">📭 Chưa có dữ liệu</td></tr>';
@@ -349,15 +588,20 @@ class RepairManager {
         tbody.innerHTML = list.map((repair) => {
             const isExpanded = this.expandedRepairId === repair.id;
             const notePreview = (repair.ghiChu || '').trim() || '-';
+            const checked = this.selectedRepairIds.has(repair.id) ? 'checked' : '';
             return `
             <tr class="repair-row ${isExpanded ? 'expanded' : ''}" data-id="${repair.id}">
+                ${this.selectionMode ? `
+                <td class="select-cell">
+                    <input type="checkbox" class="select-bullet" data-select-id="${repair.id}" ${checked} aria-label="Chọn phiếu ${repair.id}">
+                </td>` : ''}
                 <td><strong>#${String(repair.id).padStart(3, '0')}</strong></td>
                 <td>${repair.ngayNhan}</td>
                 <td>${repair.tenKhach}</td>
                 <td>${repair.sdt}</td>
                 <td>${repair.tenMay}</td>
                 <td>${notePreview}</td>
-                <td>
+                <td class="status-cell">
                     <select class="status-select" data-status-id="${repair.id}">
                         <option value="Chưa xử lý" ${repair.tinhTrang === 'Chưa xử lý' ? 'selected' : ''}>Chưa xử lý</option>
                         <option value="Đang xử lý" ${repair.tinhTrang === 'Đang xử lý' ? 'selected' : ''}>Đang xử lý</option>
@@ -365,11 +609,11 @@ class RepairManager {
                         <option value="Đã trả máy" ${repair.tinhTrang === 'Đã trả máy' ? 'selected' : ''}>Đã trả máy</option>
                     </select>
                 </td>
-                <td>${repair.ngayTra || '-'}</td>
+                <td class="return-date-cell">${repair.ngayTra || '-'}</td>
             </tr>
             ${isExpanded ? `
             <tr class="repair-detail-row">
-                <td colspan="8">
+                <td colspan="${colspan}">
                     <div class="repair-detail-box">
                         <div class="repair-detail-grid">
                             <div><strong>Mô tả lỗi:</strong> ${repair.moTaLoi || '-'}
@@ -398,8 +642,19 @@ class RepairManager {
         tbody.querySelectorAll('.repair-row').forEach((row) => {
             row.addEventListener('click', (e) => {
                 if (e.target.closest('button, select, textarea, input')) return;
+                if (this.selectionMode) return;
                 const id = Number(row.dataset.id);
                 this.toggleRepairDetails(id);
+            });
+        });
+
+        tbody.querySelectorAll('[data-select-id]').forEach((checkbox) => {
+            checkbox.addEventListener('click', (e) => e.stopPropagation());
+            checkbox.addEventListener('change', () => {
+                const id = Number(checkbox.dataset.selectId);
+                if (checkbox.checked) this.selectedRepairIds.add(id);
+                else this.selectedRepairIds.delete(id);
+                this.renderSelectionPanel();
             });
         });
 
@@ -435,6 +690,43 @@ class RepairManager {
                 await this.updateRepairStatus(id, newStatus);
             });
         });
+        this.renderSelectionPanel();
+        this.fixSelectionPanelText();
+    }
+
+    toggleSelectAllFiltered(checked) {
+        const list = this.getFilteredRepairs();
+        if (checked) {
+            list.forEach((repair) => this.selectedRepairIds.add(repair.id));
+        } else {
+            list.forEach((repair) => this.selectedRepairIds.delete(repair.id));
+        }
+        this.renderTable();
+    }
+
+    async deleteSelectedRepairs() {
+        const ids = [...this.selectedRepairIds];
+        if (!ids.length) {
+            this.showNotification('Khong co phieu nao duoc chon', 'error');
+            return;
+        }
+
+        const confirmed = window.confirm(`Ban co chac muon xoa ${ids.length} phieu da chon?`);
+        if (!confirmed) return;
+
+        try {
+            await this.apiRequest(`${this.API_BASE}/api/repairs`, 'DELETE', { ids });
+            this.repairs = this.repairs.filter((repair) => !this.selectedRepairIds.has(repair.id));
+            this.selectedRepairIds.clear();
+            this.expandedRepairId = null;
+            this.saveLocalRepairs(this.repairs);
+            this.renderTable();
+            this.renderSummaryCards();
+            this.showNotification('Da xoa cac phieu da chon');
+        } catch (error) {
+            console.error('deleteSelectedRepairs error:', error);
+            this.showNotification(`Loi xoa du lieu: ${error.message}`, 'error');
+        }
     }
 
     async updateRepairStatus(id, newStatus) {
@@ -533,19 +825,40 @@ class RepairManager {
     openInvoiceModal(id) {
         const repair = this.repairs.find(r => r.id === id);
         if (!repair) return;
+        const invoiceSource = repair.invoiceDraft || repair.invoice || {};
 
         document.getElementById('invoiceRepairId').value = id;
-        document.getElementById('invoiceDiscount').value = this.formatThousands(repair.invoice?.discount || 0);
-        document.getElementById('invoiceDevice').value = repair.invoice?.device || repair.tenMay || '';
+        document.getElementById('invoiceDiscount').value = this.formatThousands(invoiceSource.discount || 0);
+        document.getElementById('invoiceDevice').value = invoiceSource.device || repair.tenMay || '';
         document.getElementById('invoiceService').value = '';
         document.getElementById('invoiceQty').value = 1;
         document.getElementById('invoiceAmount').value = '';
         document.getElementById('invoiceLines').innerHTML = '';
 
-        this.currentInvoiceServices = Array.isArray(repair.invoice?.services) ? [...repair.invoice.services] : [];
+        this.currentInvoiceServices = Array.isArray(invoiceSource.services) ? [...invoiceSource.services] : [];
         this.renderInvoiceServices();
         this.calculateInvoiceTotal();
         this.openModal('invoiceModal');
+    }
+
+    persistInvoiceDraft(repair) {
+        if (!repair) return;
+
+        const device = (document.getElementById('invoiceDevice')?.value || '').trim() || repair.tenMay || '';
+        const discount = this.parseFormattedNumber(document.getElementById('invoiceDiscount')?.value || '0');
+        repair.invoiceDraft = {
+            device,
+            discount,
+            services: [...this.currentInvoiceServices]
+        };
+        this.saveLocalRepairs(this.repairs);
+    }
+
+    persistCurrentInvoiceDraft() {
+        const id = Number(document.getElementById('invoiceRepairId')?.value);
+        if (!id || Number.isNaN(id)) return;
+        const repair = this.repairs.find(r => r.id === id);
+        this.persistInvoiceDraft(repair);
     }
 
     addInvoiceService() {
@@ -560,6 +873,7 @@ class RepairManager {
         }
 
         this.currentInvoiceServices.push({ service, device, qty, amount });
+        this.persistCurrentInvoiceDraft();
         this.renderInvoiceServices();
         this.calculateInvoiceTotal();
 
@@ -570,6 +884,7 @@ class RepairManager {
 
     removeInvoiceService(index) {
         this.currentInvoiceServices.splice(index, 1);
+        this.persistCurrentInvoiceDraft();
         this.renderInvoiceServices();
         this.calculateInvoiceTotal();
     }
@@ -639,6 +954,8 @@ class RepairManager {
         const total = Math.max(0, subtotal - discount);
 
         repair.invoice = { device, services, discount, subtotal, total };
+        repair.invoiceDraft = null;
+        this.saveLocalRepairs(this.repairs);
         this.closeModal('invoiceModal');
         this.showPrintModal(repair, true);
     }
