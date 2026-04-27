@@ -20,6 +20,7 @@ class RepairManager {
         this.noteCurrentPage = 1;
         this.noteRowsPerPage = 8;
         this.openNoteMenuId = null;
+        this.editingNoteId = null; // Track which note is being edited
         this.STORAGE_KEY = 'wincare_repairs';
         this.BACKUP_URL = 'https://script.google.com/macros/s/AKfycbwbBLpp8ydoZ42e3Ivv6pevuUX6d8uVI478NE511oVkJHIyBExD34Q1Ct13IVFAKJSz/exec';
     }
@@ -187,41 +188,60 @@ class RepairManager {
             this.renderTable();
         });
         const noteInput = document.getElementById('noteInput');
-        // 🔥 CLICK LIST NOTE
-            document.getElementById('noteList')?.addEventListener('click', (e) => {
+        const noteList = document.getElementById('noteList');
 
-        // ❌ XÓA
-             if (e.target.classList.contains('note-delete')) {
-                const id = e.target.dataset.id;
-                this.notes = this.notes.filter(n => n.id != id);
-                 this.renderNotes();
+        // NOTE LIST: Click delegation
+        noteList?.addEventListener('click', async (e) => {
+            const target = e.target;
+            const item = target.closest('.note-item');
+
+            // ❌ DELETE NOTE
+            if (target.classList.contains('note-delete')) {
+                const id = target.dataset.id;
+                if (id) {
+                    await this.deleteNote(id);
+                }
+                return;
+            }
+
+            // ✏️ EDIT NOTE (click on text area)
+            if (target.closest('.note-text') && item) {
+    const id = item.dataset.id;
+
+    // luôn cho phép chuyển note đang edit
+    if (id) {
+        this.startEditingNote(id);
     }
-    // 🔥 SAVE KHI SỬA
-document.getElementById('noteList')?.addEventListener('blur', (e) => {
-    if (e.target.classList.contains('note-text')) {
-
-        const item = e.target.closest('.note-item');
-        const id = item.dataset.id;
-        const value = e.target.innerText.trim();
-
-        this.notes = this.notes.map(n =>
-            n.id == id ? { ...n, content: value } : n
-        );
-    }
-}, true);
-});
-if (noteInput) {
-    noteInput.addEventListener('keydown', async (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            await this.addNoteFromInput(noteInput);
-        }
-    });
-
-    noteInput.addEventListener('blur', async () => {
-        await this.addNoteFromInput(noteInput);
-    });
 }
+        });
+
+        // EDIT INPUT: Event delegation for Enter key and blur
+        noteList?.addEventListener('keydown', (e) => {
+            if (e.target.classList.contains('note-edit-input') && e.key === 'Enter') {
+                e.preventDefault();
+                this.saveEditNote(e.target);
+            }
+        });
+
+        noteList?.addEventListener('blur', (e) => {
+            if (e.target.classList.contains('note-edit-input')) {
+                this.saveEditNote(e.target);
+            }
+        }, true);
+
+        // ADD NEW NOTE
+        if (noteInput) {
+            noteInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    await this.addNoteFromInput(noteInput);
+                }
+            });
+
+            noteInput.addEventListener('blur', async () => {
+                await this.addNoteFromInput(noteInput);
+            });
+        }
         document.getElementById('rowsPerPageSelect')?.addEventListener('change', (e) => {
             const nextRows = Number(e.target.value) || 15;
             this.rowsPerPage = [15, 30, 50].includes(nextRows) ? nextRows : 15;
@@ -439,6 +459,11 @@ if (noteInput) {
         const ok = window.confirm('Bạn có chắc muốn xóa note này?');
         if (!ok) return;
 
+        // Cancel editing if deleting the editing note
+        if (this.editingNoteId == id) {
+            this.editingNoteId = null;
+        }
+
         try {
             await this.apiRequest(`${this.API_BASE}/api/notes/${id}`, 'DELETE');
             this.notes = this.notes.filter((n) => Number(n.id) !== Number(id));
@@ -454,28 +479,78 @@ if (noteInput) {
     }
 
     renderNotes() {
-    const listEl = document.getElementById('noteList');
-    if (!listEl) return;
+        const listEl = document.getElementById('noteList');
+        if (!listEl) return;
 
-    if (!this.notes || this.notes.length === 0) {
-        listEl.innerHTML = '<div class="summary-empty">Chưa có note nào.</div>';
-        return;
+        if (!this.notes || this.notes.length === 0) {
+            listEl.innerHTML = '<div class="summary-empty">Chưa có note nào.</div>';
+            return;
+        }
+
+        listEl.innerHTML = this.notes.map(note => {
+            const isEditing = this.editingNoteId == note.id;
+            return `
+            <div class="note-item" data-id="${note.id}">
+                <div class="note-dot"></div>
+                ${isEditing
+                    ? `<input type="text" class="note-edit-input" data-id="${note.id}" value="${this.escapeHtml(note.content || '')}" />`
+                    : `<span class="note-text">${this.escapeHtml(note.content || '')}</span>`
+                }
+                <button class="note-delete" data-id="${note.id}">×</button>
+            </div>
+        `}).join('');
+
+        // Focus the edit input if editing
+        if (this.editingNoteId) {
+            const editInput = listEl.querySelector('.note-edit-input');
+            if (editInput) {
+                editInput.focus();
+editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+            }
+        }
     }
 
-    listEl.innerHTML = this.notes.map(note => `
-        <div class="note-item" data-id="${note.id}">
-            
-            <div class="note-dot"></div>
+    // Escape HTML to prevent XSS
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-            <div class="note-text" contenteditable="true">
-                ${note.content}
-            </div>
+    // Start editing a note
+    startEditingNote(id) {
+        this.editingNoteId = Number(id);
+        this.renderNotes();
+    }
 
-            <button class="note-delete" data-id="${note.id}">×</button>
-
-        </div>
-    `).join('');
+    // Save editing note (called by Enter key or blur)
+    async saveEditNote(inputEl) {
+        if (!inputEl) return;
+        const id = inputEl.dataset.id;
+        const value = inputEl.value.trim();
+if (!value) {
+    this.editingNoteId = null;
+    this.renderNotes();
+    return;
 }
+        // Quick local update
+        this.notes = this.notes.map(n =>
+            Number(n.id) === Number(id) ? { ...n, content: value } : n
+        );
+        this.editingNoteId = null;
+        this.renderNotes();
+
+        // API sync
+        try {
+            await this.apiRequest(`${this.API_BASE}/api/notes/${id}`, 'PUT', { content: value });
+            this.showNotification('✅ Đã cập nhật note');
+        } catch (error) {
+            console.error('saveEditNote error:', error);
+            // Revert on error
+            await this.fetchNotes();
+            this.showNotification(`❌ Lỗi cập nhật: ${error.message}`, 'error');
+        }
+    }
 
     openModal(modalId) {
         const el = document.getElementById(modalId);

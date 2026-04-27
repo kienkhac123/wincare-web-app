@@ -1319,6 +1319,17 @@ tr:hover {
     cursor: text;
 }
 
+/* edit input */
+.note-edit-input {
+    flex: 1;
+    padding: 2px 4px;
+    border: 1px solid #4CAF50;
+    border-radius: 2px;
+    outline: none;
+    font-size: inherit;
+    font-family: inherit;
+}
+
 /* nút X */
 .note-delete {
     width: 18px;
