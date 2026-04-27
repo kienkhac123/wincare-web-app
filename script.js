@@ -499,13 +499,18 @@ class RepairManager {
             </div>
         `}).join('');
 
-        // Focus the edit input if editing
+        // Focus the edit input if editing - delay to ensure DOM is ready
         if (this.editingNoteId) {
-            const editInput = listEl.querySelector('.note-edit-input');
-            if (editInput) {
-                editInput.focus();
-                editInput.setSelectionRange(editInput.value.length, editInput.value.length);
-            }
+            setTimeout(() => {
+                const editInput = listEl.querySelector('.note-edit-input');
+                if (editInput) {
+                    editInput.focus();
+                    editInput.setSelectionRange(
+                        editInput.value.length,
+                        editInput.value.length
+                    );
+                }
+            }, 0);
         }
     }
 
@@ -519,7 +524,10 @@ class RepairManager {
     // Start editing a note
     startEditingNote(id) {
         this.editingNoteId = Number(id);
-        this.renderNotes();
+
+        setTimeout(() => {
+            this.renderNotes();
+        }, 0);
     }
 
     // Save editing note (called by Enter key or blur)
