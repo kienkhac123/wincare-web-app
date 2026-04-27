@@ -13,6 +13,13 @@ class RepairManager {
         this.selectionDateFrom = '';
         this.selectionDateTo = '';
         this.currentInvoiceServices = [];
+        this.currentPrintIsInvoice = false;
+        this.rowsPerPage = 15;
+        this.currentPage = 1;
+        this.notes = [];
+        this.noteCurrentPage = 1;
+        this.noteRowsPerPage = 8;
+        this.openNoteMenuId = null;
         this.STORAGE_KEY = 'wincare_repairs';
         this.BACKUP_URL = 'https://script.google.com/macros/s/AKfycbwbBLpp8ydoZ42e3Ivv6pevuUX6d8uVI478NE511oVkJHIyBExD34Q1Ct13IVFAKJSz/exec';
     }
@@ -131,8 +138,10 @@ class RepairManager {
     async init() {
         this.bindEvents();
         await this.fetchRepairs();
+        await this.fetchNotes();
         this.renderTable();
         this.renderSummaryCards();
+        this.renderNotes();
     }
 
     bindEvents() {
@@ -169,10 +178,64 @@ class RepairManager {
 
         document.getElementById('searchInput')?.addEventListener('input', (e) => {
             this.searchKeyword = (e.target.value || '').trim().toLowerCase();
+            this.currentPage = 1;
             this.renderTable();
         });
         document.getElementById('statusFilter')?.addEventListener('change', (e) => {
             this.statusFilter = e.target.value || 'all';
+            this.currentPage = 1;
+            this.renderTable();
+        });
+        const noteInput = document.getElementById('noteInput');
+        // 🔥 CLICK LIST NOTE
+            document.getElementById('noteList')?.addEventListener('click', (e) => {
+
+        // ❌ XÓA
+             if (e.target.classList.contains('note-delete')) {
+                const id = e.target.dataset.id;
+                this.notes = this.notes.filter(n => n.id != id);
+                 this.renderNotes();
+    }
+    // 🔥 SAVE KHI SỬA
+document.getElementById('noteList')?.addEventListener('blur', (e) => {
+    if (e.target.classList.contains('note-text')) {
+
+        const item = e.target.closest('.note-item');
+        const id = item.dataset.id;
+        const value = e.target.innerText.trim();
+
+        this.notes = this.notes.map(n =>
+            n.id == id ? { ...n, content: value } : n
+        );
+    }
+}, true);
+});
+if (noteInput) {
+    noteInput.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            await this.addNoteFromInput(noteInput);
+        }
+    });
+
+    noteInput.addEventListener('blur', async () => {
+        await this.addNoteFromInput(noteInput);
+    });
+}
+        document.getElementById('rowsPerPageSelect')?.addEventListener('change', (e) => {
+            const nextRows = Number(e.target.value) || 15;
+            this.rowsPerPage = [15, 30, 50].includes(nextRows) ? nextRows : 15;
+            this.currentPage = 1;
+            this.renderTable();
+        });
+        document.getElementById('prevPageBtn')?.addEventListener('click', () => {
+            this.currentPage = Math.max(1, this.currentPage - 1);
+            this.renderTable();
+        });
+        document.getElementById('nextPageBtn')?.addEventListener('click', () => {
+            const totalItems = this.getFilteredRepairs().length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / this.rowsPerPage));
+            this.currentPage = Math.min(totalPages, this.currentPage + 1);
             this.renderTable();
         });
         document.getElementById('toggleSelectMode')?.addEventListener('click', () => {
@@ -184,25 +247,46 @@ class RepairManager {
         document.getElementById('selectAllRepairs')?.addEventListener('change', (e) => {
             this.toggleSelectAllFiltered(e.target.checked);
         });
-        document.querySelectorAll('input[name="selectionTimeMode"]').forEach((radio) => {
-            radio.addEventListener('change', (e) => {
-                this.selectionTimeMode = e.target.value || 'preset';
-                this.renderSelectionPanel();
-                this.renderTable();
-            });
-        });
-        document.getElementById('timePresetFilter')?.addEventListener('change', (e) => {
-            this.selectionTimePreset = e.target.value || 'all';
-            this.renderTable();
-        });
-        document.getElementById('customDateFrom')?.addEventListener('change', (e) => {
-            this.selectionDateFrom = e.target.value || '';
-            this.renderTable();
-        });
+       document.getElementById('timePresetFilter')?.addEventListener('change', (e) => {
+    this.selectionTimePreset = e.target.value || 'all';
+
+    // 🔥 XÓA ngày custom
+    this.selectionDateFrom = '';
+    this.selectionDateTo = '';
+
+    const fromInput = document.getElementById('customDateFrom');
+    const toInput = document.getElementById('customDateTo');
+
+    if (fromInput) fromInput.value = '';
+    if (toInput) toInput.value = '';
+
+    this.currentPage = 1;
+    this.renderTable();
+});
+       document.getElementById('customDateFrom')?.addEventListener('change', (e) => {
+    this.selectionDateFrom = e.target.value || '';
+
+    // 🔥 RESET preset về ALL
+    this.selectionTimePreset = 'all';
+
+    const preset = document.getElementById('timePresetFilter');
+    if (preset) preset.value = 'all';
+
+    this.currentPage = 1;
+    this.renderTable();
+});
         document.getElementById('customDateTo')?.addEventListener('change', (e) => {
-            this.selectionDateTo = e.target.value || '';
-            this.renderTable();
-        });
+   this.selectionDateTo = e.target.value || '';
+
+    // 🔥 RESET preset về ALL
+    this.selectionTimePreset = 'all';
+
+    const preset = document.getElementById('timePresetFilter');
+    if (preset) preset.value = 'all';
+
+    this.currentPage = 1;
+    this.renderTable();
+});
 
         document.getElementById('staleList')?.addEventListener('click', (e) => {
             const item = e.target.closest('.summary-item[data-repair-id]');
@@ -220,6 +304,16 @@ class RepairManager {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
+        document.getElementById('notePrevBtn')?.addEventListener('click', () => {
+            this.noteCurrentPage = Math.max(1, this.noteCurrentPage - 1);
+            this.renderNotes();
+        });
+        document.getElementById('noteNextBtn')?.addEventListener('click', () => {
+            const totalPages = Math.max(1, Math.ceil(this.notes.length / this.noteRowsPerPage));
+            this.noteCurrentPage = Math.min(totalPages, this.noteCurrentPage + 1);
+            this.renderNotes();
+        });
+
         window.addEventListener('scroll', () => {
             const fabTop = document.getElementById('fabTop');
             if (!fabTop) return;
@@ -234,8 +328,154 @@ class RepairManager {
             if (event.target === createModal) this.closeModal('createModal');
             if (event.target === invoiceModal) this.closeModal('invoiceModal');
             if (event.target === printModal) this.closeModal('printModal');
+
+            if (!event.target.closest('.note-actions')) {
+                this.openNoteMenuId = null;
+                this.renderNotes();
+            }
         });
+        document.getElementById('clearFilterBtn')?.addEventListener('click', () => {
+
+    // 🔥 RESET STATE
+    this.selectionTimePreset = 'all';
+    this.selectionDateFrom = '';
+    this.selectionDateTo = '';
+
+    // 🔥 RESET UI
+    const preset = document.getElementById('timePresetFilter');
+    const from = document.getElementById('customDateFrom');
+    const to = document.getElementById('customDateTo');
+
+    if (preset) preset.value = 'all';
+    if (from) from.value = '';
+    if (to) to.value = '';
+
+    // 🔥 RESET PAGE + RENDER
+    this.currentPage = 1;
+    this.renderTable();
+});
     }
+
+    async fetchNotes() {
+        try {
+            const data = await this.apiRequest(`${this.API_BASE}/api/notes?limit=200&page=1`, 'GET');
+            this.notes = Array.isArray(data?.items) ? data.items : [];
+        } catch (error) {
+            console.error('fetchNotes error:', error);
+            this.notes = [];
+        }
+    }
+
+    formatDateTimeVN(input) {
+        const d = new Date(input);
+        if (Number.isNaN(d.getTime())) return '-';
+        return d.toLocaleString('vi-VN');
+    }
+
+    async createNote() {
+        const content = window.prompt('Nhập nội dung note/checklist:');
+        if (content === null) return;
+        const trimmed = String(content || '').trim();
+        if (!trimmed) {
+            this.showNotification('❌ Nội dung note không được để trống', 'error');
+            return;
+        }
+
+        try {
+            const created = await this.apiRequest(`${this.API_BASE}/api/notes`, 'POST', { content: trimmed });
+            this.notes = [created, ...this.notes];
+            this.noteCurrentPage = 1;
+            this.renderNotes();
+            this.showNotification('✅ Đã thêm note');
+        } catch (error) {
+            console.error('createNote error:', error);
+            this.showNotification(`❌ Lỗi thêm note: ${error.message}`, 'error');
+        }
+        
+    }
+    async addNoteFromInput(input) {
+    const value = input.value.trim();
+    if (!value) return;
+
+    try {
+        const created = await this.apiRequest(`${this.API_BASE}/api/notes`, 'POST', {
+            content: value
+        });
+
+        this.notes = [created, ...this.notes];
+
+        input.value = '';
+
+        this.renderNotes();
+    } catch (error) {
+        console.error(error);
+    }
+}
+    async editNote(id) {
+        const note = this.notes.find((n) => Number(n.id) === Number(id));
+        if (!note) return;
+
+        const next = window.prompt('Sửa nội dung note:', note.content || '');
+        if (next === null) return;
+        const trimmed = String(next || '').trim();
+        if (!trimmed) {
+            this.showNotification('❌ Nội dung note không được để trống', 'error');
+            return;
+        }
+
+        try {
+            const updated = await this.apiRequest(`${this.API_BASE}/api/notes/${id}`, 'PUT', { content: trimmed });
+            this.notes = this.notes.map((n) => (Number(n.id) === Number(id) ? updated : n));
+            this.openNoteMenuId = null;
+            this.renderNotes();
+            this.showNotification('✅ Đã cập nhật note');
+        } catch (error) {
+            console.error('editNote error:', error);
+            this.showNotification(`❌ Lỗi sửa note: ${error.message}`, 'error');
+        }
+    }
+
+    async deleteNote(id) {
+        const ok = window.confirm('Bạn có chắc muốn xóa note này?');
+        if (!ok) return;
+
+        try {
+            await this.apiRequest(`${this.API_BASE}/api/notes/${id}`, 'DELETE');
+            this.notes = this.notes.filter((n) => Number(n.id) !== Number(id));
+            const totalPages = Math.max(1, Math.ceil(this.notes.length / this.noteRowsPerPage));
+            if (this.noteCurrentPage > totalPages) this.noteCurrentPage = totalPages;
+            this.openNoteMenuId = null;
+            this.renderNotes();
+            this.showNotification('✅ Đã xóa note khỏi SQL');
+        } catch (error) {
+            console.error('deleteNote error:', error);
+            this.showNotification(`❌ Lỗi xóa note: ${error.message}`, 'error');
+        }
+    }
+
+    renderNotes() {
+    const listEl = document.getElementById('noteList');
+    if (!listEl) return;
+
+    if (!this.notes || this.notes.length === 0) {
+        listEl.innerHTML = '<div class="summary-empty">Chưa có note nào.</div>';
+        return;
+    }
+
+    listEl.innerHTML = this.notes.map(note => `
+        <div class="note-item" data-id="${note.id}">
+            
+            <div class="note-dot"></div>
+
+            <div class="note-text" contenteditable="true">
+                ${note.content}
+            </div>
+
+            <button class="note-delete" data-id="${note.id}">×</button>
+
+        </div>
+    `).join('');
+}
 
     openModal(modalId) {
         const el = document.getElementById(modalId);
@@ -472,84 +712,183 @@ class RepairManager {
         return `${year}-${month}-${day}`;
     }
 
-    getDateRangeForSelectionFilter() {
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // getDateRangeForSelectionFilter() {
+    // const now = new Date();
+    // const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        if (this.selectionTimeMode === 'custom') {
-            const from = this.selectionDateFrom ? new Date(`${this.selectionDateFrom}T00:00:00`) : null;
-            const to = this.selectionDateTo ? new Date(`${this.selectionDateTo}T23:59:59`) : null;
-            return { from, to };
-        }
+    // // 🔥 ƯU TIÊN CUSTOM
+    // if (this.selectionTimeMode === 'custom') {
+    //     const from = this.selectionDateFrom
+    //         ? new Date(this.selectionDateFrom + 'T00:00:00')
+    //         : null;
 
-        switch (this.selectionTimePreset) {
+    //     const to = this.selectionDateTo
+    //         ? new Date(this.selectionDateTo + 'T23:59:59')
+    //         : null;
+
+    //     return { from, to };
+    // }
+
+    //     switch (this.selectionTimePreset) {
+    //     case 'today':
+    //         return { from: today, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+    //     case 'yesterday': {
+    //         const from = new Date(today);
+    //         from.setDate(from.getDate() - 1);
+    //         return { from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate(), 23, 59, 59) };
+    //     }
+    //     case 'thisWeek': {
+    //         const day = today.getDay() || 7;
+    //         const from = new Date(today);
+    //         from.setDate(today.getDate() - day + 1);
+    //         return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+    //     }
+    //     case 'lastWeek': {
+    //         const day = today.getDay() || 7;
+    //         const end = new Date(today);
+    //         end.setDate(today.getDate() - day);
+    //         const from = new Date(end);
+    //         from.setDate(end.getDate() - 6);
+    //         return { from, to: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59) };
+    //     }
+    //     case 'last7days': {
+    //         const from = new Date(today);
+    //         from.setDate(today.getDate() - 6);
+    //         return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+    //     }
+    //     case 'thisMonth':
+    //         return {
+    //             from: new Date(today.getFullYear(), today.getMonth(), 1),
+    //             to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+    //         };
+    //     case 'lastMonth': {
+    //         const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    //         const to = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+    //         return { from, to };
+    //     }
+    //     case 'last30days': {
+    //         const from = new Date(today);
+    //         from.setDate(today.getDate() - 29);
+    //         return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+    //     }
+    //     case 'thisYear':
+    //         return {
+    //             from: new Date(today.getFullYear(), 0, 1),
+    //             to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+    //         };
+    //     case 'lastYear':
+    //         return {
+    //             from: new Date(today.getFullYear() - 1, 0, 1),
+    //             to: new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59)
+    //         };
+    //     default:
+    //         return { from: null, to: null };
+    //     }
+    // }
+getDateRangeForSelectionFilter() {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let from = null;
+    let to = null;
+
+    // 🔥 ƯU TIÊN DATE CUSTOM
+    if (this.selectionDateFrom || this.selectionDateTo) {
+        from = this.selectionDateFrom
+            ? new Date(this.selectionDateFrom + 'T00:00:00')
+            : null;
+
+        to = this.selectionDateTo
+            ? new Date(this.selectionDateTo + 'T23:59:59')
+            : null;
+
+        return { from, to };
+    }
+
+    switch (this.selectionTimePreset) {
+
         case 'today':
-            return { from: today, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
-        case 'yesterday': {
-            const from = new Date(today);
-            from.setDate(from.getDate() - 1);
-            return { from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate(), 23, 59, 59) };
-        }
+            from = today;
+            to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+            break;
+
+        case 'yesterday':
+            from = new Date(today);
+            from.setDate(today.getDate() - 1);
+            to = new Date(from.getFullYear(), from.getMonth(), from.getDate(), 23, 59, 59);
+            break;
+
         case 'thisWeek': {
-            const day = today.getDay() || 7;
-            const from = new Date(today);
+            const day = today.getDay() || 7; // CN = 7
+            from = new Date(today);
             from.setDate(today.getDate() - day + 1);
-            return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+            to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+            break;
         }
+
         case 'lastWeek': {
             const day = today.getDay() || 7;
-            const end = new Date(today);
-            end.setDate(today.getDate() - day);
-            const from = new Date(end);
-            from.setDate(end.getDate() - 6);
-            return { from, to: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59) };
+            from = new Date(today);
+            from.setDate(today.getDate() - day - 6);
+            to = new Date(today);
+            to.setDate(today.getDate() - day);
+            to.setHours(23, 59, 59);
+            break;
         }
-        case 'last7days': {
-            const from = new Date(today);
+
+        case 'last7days':
+            from = new Date(today);
             from.setDate(today.getDate() - 6);
-            return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
-        }
+            to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+            break;
+
         case 'thisMonth':
-            return {
-                from: new Date(today.getFullYear(), today.getMonth(), 1),
-                to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
-            };
-        case 'lastMonth': {
-            const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-            const to = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
-            return { from, to };
-        }
-        case 'last30days': {
-            const from = new Date(today);
+            from = new Date(today.getFullYear(), today.getMonth(), 1);
+            to = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+            break;
+
+        case 'lastMonth':
+            from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            to = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+            break;
+
+        case 'last30days':
+            from = new Date(today);
             from.setDate(today.getDate() - 29);
-            return { from, to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
-        }
+            to = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+            break;
+
         case 'thisYear':
-            return {
-                from: new Date(today.getFullYear(), 0, 1),
-                to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
-            };
+            from = new Date(today.getFullYear(), 0, 1);
+            to = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+            break;
+
         case 'lastYear':
-            return {
-                from: new Date(today.getFullYear() - 1, 0, 1),
-                to: new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59)
-            };
+            from = new Date(today.getFullYear() - 1, 0, 1);
+            to = new Date(today.getFullYear() - 1, 11, 31, 23, 59, 59);
+            break;
+
         default:
-            return { from: null, to: null };
-        }
+            from = null;
+            to = null;
     }
 
+    return { from, to };
+}
     matchesSelectionDateFilter(repair) {
-        if (!this.selectionMode) return true;
+    // ❌ BỎ DÒNG NÀY
+    // if (!this.selectionMode) return true;
 
-        const repairDate = this.parseViDate(repair.ngayNhan);
-        if (!repairDate) return false;
+    const repairDate = this.parseViDate(repair.ngayNhan);
+    if (!repairDate) return false;
 
-        const { from, to } = this.getDateRangeForSelectionFilter();
-        if (from && repairDate < from) return false;
-        if (to && repairDate > to) return false;
-        return true;
-    }
+    const { from, to } = this.getDateRangeForSelectionFilter();
+
+    if (from && repairDate < from) return false;
+    if (to && repairDate > to) return false;
+
+    return true;
+}
 
     getFilteredRepairs() {
         const keyword = this.searchKeyword;
@@ -565,23 +904,50 @@ class RepairManager {
         });
     }
 
+    renderPagination(totalItems, pageItemsCount) {
+        const rowsSelect = document.getElementById('rowsPerPageSelect');
+        const prevBtn = document.getElementById('prevPageBtn');
+        const nextBtn = document.getElementById('nextPageBtn');
+        const infoEl = document.getElementById('paginationInfo');
+        const pageIndicator = document.getElementById('pageIndicator');
+
+        if (rowsSelect) rowsSelect.value = String(this.rowsPerPage);
+
+        const totalPages = Math.max(1, Math.ceil(totalItems / this.rowsPerPage));
+        if (this.currentPage > totalPages) this.currentPage = totalPages;
+        if (this.currentPage < 1) this.currentPage = 1;
+
+        const start = totalItems === 0 ? 0 : ((this.currentPage - 1) * this.rowsPerPage) + 1;
+        const end = totalItems === 0 ? 0 : (start + pageItemsCount - 1);
+
+        if (prevBtn) prevBtn.disabled = this.currentPage <= 1 || totalItems === 0;
+        if (nextBtn) nextBtn.disabled = this.currentPage >= totalPages || totalItems === 0;
+        if (pageIndicator) pageIndicator.textContent = `Trang ${this.currentPage}/${totalPages}`;
+        if (infoEl) infoEl.textContent = `Hiển thị ${start}-${end} của tổng ${totalItems} dòng`;
+    }
+
     renderTable() {
         const tbody = document.getElementById('repairList');
         if (!tbody) return;
 
-        const list = this.getFilteredRepairs();
+        const filteredList = this.getFilteredRepairs();
+        const totalItems = filteredList.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / this.rowsPerPage));
+        if (this.currentPage > totalPages) this.currentPage = totalPages;
+        if (this.currentPage < 1) this.currentPage = 1;
+
+        const startIndex = (this.currentPage - 1) * this.rowsPerPage;
+        const endIndex = startIndex + this.rowsPerPage;
+        const list = filteredList.slice(startIndex, endIndex);
+
         const colspan = this.selectionMode ? 9 : 8;
         tbody.innerHTML = '';
 
-        if (!list.length) {
+        if (!filteredList.length) {
             tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:24px;color:#7f8c8d;">Không có dữ liệu</td></tr>`;
+            this.renderPagination(0, 0);
             this.renderSelectionPanel();
             this.fixSelectionPanelText();
-            return;
-        }
-
-        if (!list.length) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#7f8c8d;">📭 Chưa có dữ liệu</td></tr>';
             return;
         }
 
@@ -690,6 +1056,7 @@ class RepairManager {
                 await this.updateRepairStatus(id, newStatus);
             });
         });
+        this.renderPagination(totalItems, list.length);
         this.renderSelectionPanel();
         this.fixSelectionPanelText();
     }
@@ -963,6 +1330,7 @@ class RepairManager {
     showPrintModal(repair, isInvoice = false) {
         const printContent = document.getElementById('printContent');
         if (!printContent || !repair) return;
+        this.currentPrintIsInvoice = Boolean(isInvoice);
         printContent.innerHTML = this.generatePrintHTML(repair, isInvoice);
 
         if (!printContent.querySelector('.invoice-note')) {
@@ -985,6 +1353,67 @@ class RepairManager {
         this.openModal('printModal');
     }
 
+    getPrintDocumentStyles() {
+        const isInvoice = this.currentPrintIsInvoice;
+        const titleSize = isInvoice ? '16px' : '20px';
+        const blockSize = isInvoice ? '13px' : '16px';
+        const tableSize = isInvoice ? '11px' : '13px';
+        const summarySize = isInvoice ? '13px' : '16px';
+
+        return `
+            @page { size: 80mm auto; margin: 0; }
+
+            html, body {
+                margin: 0;
+                padding: 0;
+                background: #fff;
+                color: #000;
+                font-family: Arial, sans-serif;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .print-shell {
+                width: 80mm;
+                max-width: 80mm;
+                margin: 0 auto;
+                background: #fff;
+            }
+
+            .print-receipt,
+            .invoice-style {
+                width: 100%;
+                border: 1px solid #000;
+                padding: 8px;
+                line-height: 1.35;
+                background: #fff;
+                box-sizing: border-box;
+            }
+
+            .invoice-logo { text-align: center; font-size: ${isInvoice ? '18px' : '20px'}; font-weight: 700; margin-bottom: 2px; }
+            .invoice-logo span { display: block; font-size: 10px; font-weight: 500; }
+            .invoice-center { text-align: center; font-size: 12px; margin-bottom: 6px; }
+            .invoice-title { text-align: center; font-size: ${titleSize}; line-height: 1.15; margin: 6px 0 0; color: #000; text-transform: uppercase; word-break: break-word; }
+            .invoice-code { text-align: center; font-size: ${isInvoice ? '14px' : '16px'}; font-weight: 700; margin-top: 3px; }
+            .invoice-date { text-align: center; font-size: ${isInvoice ? '13px' : '16px'}; line-height: 1.2; margin: 5px 0 8px; font-weight: 700; }
+            .invoice-block { font-size: ${blockSize}; margin-bottom: 8px; word-break: break-word; }
+            .invoice-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: ${tableSize}; table-layout: fixed; }
+            .invoice-table th, .invoice-table td { border: 1px solid #000; padding: ${isInvoice ? '3px' : '4px'}; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+            .invoice-table th { text-align: center; background: #fff; color: #000; font-weight: 700; }
+            .invoice-table th:first-child, .invoice-table td:first-child { width: ${isInvoice ? '52%' : '60%'}; }
+            .invoice-table th:nth-child(2), .invoice-table td:nth-child(2) { width: ${isInvoice ? '16%' : '20%'}; text-align: center; }
+            .invoice-table th:nth-child(3), .invoice-table td:nth-child(3) { width: ${isInvoice ? '32%' : '20%'}; text-align: right; }
+            .invoice-note { display: block; color: #000; margin: 10px 0 8px; border: 1px dashed #000; padding: 8px; font-size: ${isInvoice ? '11px' : '12px'}; font-weight: 600; page-break-inside: avoid; break-inside: avoid; }
+            .invoice-summary { margin-top: 8px; font-size: ${summarySize}; }
+            .invoice-summary > div { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
+            .invoice-status { margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; font-size: ${isInvoice ? '11px' : '12px'}; word-break: break-word; }
+            .receipt-footer { margin-top: 10px; }
+            .signature { display: flex; justify-content: space-between; gap: 12px; }
+            .signature > div { flex: 1; text-align: center; font-size: 12px; }
+            .signature hr { margin-top: 22px; border: none; border-top: 1px solid #000; }
+        `;
+    }
+
     printCurrentDocument() {
         const printContent = document.getElementById('printContent');
         if (!printContent || !printContent.innerHTML.trim()) {
@@ -1000,27 +1429,7 @@ class RepairManager {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #fff;
-        }
-
-        .print-shell {
-            width: 100%;
-            max-width: 80mm;
-            margin: 0 auto;
-            background: #fff;
-        }
-
-        @media screen {
-            body {
-                padding: 12px 0;
-            }
-        }
-    </style>
+    <style>${this.getPrintDocumentStyles()}</style>
 </head>
 <body>
     <div class="print-shell">${printContent.innerHTML}</div>

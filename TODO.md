@@ -1,32 +1,32 @@
-# TODO - Rebuild Backend `server.js` (MySQL, Secure, Scalable)
+# TODO - Chuyển Bộ lọc sang panel trái + lọc thời gian
 
 ## ✅ Plan Approved
-- [x] Keep frontend untouched (`index.html`, `style.css`, `script.js` behavior compatibility).
-- [x] Rebuild backend with Node.js + Express + MySQL.
-- [x] Bind server to IPv4 host `0.0.0.0`.
+- [x] Tạo panel trái “Bộ lọc” tương tự panel note bên phải.
+- [x] Bao gồm:
+  - [x] Lọc theo tình trạng
+  - [x] Lọc theo thời gian (khung sẵn / tùy chọn ngày)
+- [x] Giữ nguyên các tính năng hiện có (search, chọn hàng loạt, pagination, note panel).
 
 ## 🔧 Implementation Steps
-- [x] Rewrite `server.js` from scratch with:
-  - [x] Express app bootstrap
-  - [x] Security middleware (`helmet`, strict `cors`, JSON parser limit)
-  - [x] MySQL pool config with UTF-8 (`utf8mb4`)
-  - [x] DB initialization + table create (`repairs`)
-  - [x] Validation/sanitization helpers
-  - [x] API routes:
-    - [x] `GET /api/repairs` (supports optional q/status/limit/offset)
-    - [x] `POST /api/repairs`
-    - [x] `PUT /api/repairs/:id/status`
-  - [x] `GET /api/health`
-  - [x] 404 + centralized error middleware
-  - [x] `app.listen(PORT, '0.0.0.0', ...)`
-- [x] Update `package.json` dependencies (add `helmet`).
+- [ ] Update `index.html`
+  - [ ] Thêm panel trái “🧰 Bộ lọc”
+  - [ ] Đưa status filter vào panel trái
+  - [ ] Thêm bộ lọc thời gian (preset/custom + from/to)
+  - [ ] Bỏ status filter ở thanh filter giữa
+- [ ] Update `style.css`
+  - [ ] Chuyển layout app thành 3 cột (left filter / main / right notes)
+  - [ ] Style panel trái đồng bộ panel phải (nền trắng + bóng xanh)
+  - [ ] Responsive dưới 1200px về 1 cột
+- [ ] Update `script.js`
+  - [ ] Bind events cho panel lọc trái
+  - [ ] Áp dụng lọc thời gian cho toàn bộ danh sách
+  - [ ] Giữ nguyên selection mode hiện có
+- [ ] Update `TODO.md`
+  - [ ] Tick hoàn tất các bước sau khi sửa
 
 ## 🧪 Testing Steps
-- [ ] Install/update dependencies.
-- [ ] Start server.
-- [ ] Curl test:
-  - [ ] Health endpoint
-  - [ ] GET repairs
-  - [ ] POST repairs (Vietnamese payload)
-  - [ ] PUT status update
-- [ ] Verify no regression with frontend API contract.
+- [ ] Verify lọc tình trạng từ panel trái hoạt động đúng
+- [ ] Verify lọc thời gian preset hoạt động đúng
+- [ ] Verify lọc khoảng ngày custom hoạt động đúng
+- [ ] Verify search + pagination + selection mode không hồi quy
+- [ ] Verify layout 3 cột desktop và responsive mobile

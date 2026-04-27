@@ -4,11 +4,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản lý sửa chữa Laptop - Wincare.vn</title>
+    <title> Quản lý sửa chữa Laptop - Wincare.vn</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='48'%3E🔧%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div class="container">
+    <div class="app-shell">
+        <aside class="filters-sidebar" id="filtersSidebar">
+            <div class="filters-card">
+                <div class="filters-header">
+                     <h3>🧰 Bộ lọc</h3>
+                     <button id="clearFilterBtn">❌</button>
+                </div>
+
+                <div class="filters-body">
+                    <div class="filter-group">
+                        <label for="statusFilter">📌 Lọc theo tình trạng</label>
+                        <select id="statusFilter">
+                            <option value="all">Tất cả tình trạng</option>
+                            <option value="Chưa xử lý">Chưa xử lý</option>
+                            <option value="Đang xử lý">Đang xử lý</option>
+                            <option value="Đã xử lý">Đã xử lý</option>
+                            <option value="Đã trả máy">Đã trả máy</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group" id="presetFilterGroup">
+                        <label for="timePresetFilter">🗓️ Lọc theo khung thời gian</label>
+                        <select id="timePresetFilter">
+                            <option value="all">Toàn thời gian</option>
+                            <option value="today">Hôm nay</option>
+                            <option value="yesterday">Hôm qua</option>
+                            <option value="thisWeek">Tuần này</option>
+                            <option value="lastWeek">Tuần trước</option>
+                            <option value="last7days">7 ngày qua</option>
+                            <option value="thisMonth">Tháng này</option>
+                            <option value="lastMonth">Tháng trước</option>
+                            <option value="last30days">30 ngày qua</option>
+                            <option value="thisYear">Năm nay</option>
+                            <option value="lastYear">Năm trước</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group" id="customDateGroup">
+                        <label>📆 Tùy chọn ngày (riêng)</label>
+                        <div class="custom-date-grid">
+                            <input type="date" id="customDateFrom">
+                            <input type="date" id="customDateTo">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="container">
         <header>
             <div class="header-top">
                 <div>
@@ -37,70 +86,30 @@
 
             <div class="filter-bar">
                 <div class="filter-item search-item" id="searchFilterItem">
-                    <label for="searchInput">Tìm kiếm</label>
+                    <label for="searchInput">🔎 Tìm kiếm</label>
                     <input
                         type="text"
                         id="searchInput"
                         placeholder="Nhập tên khách / số điện thoại / tên máy..."
                     >
                 </div>
-                <div class="filter-item">
-                    <label for="statusFilter">Lọc theo tình trạng</label>
-                    <select id="statusFilter">
-                        <option value="all">Tất cả tình trạng</option>
-                        <option value="Chưa xử lý">Chưa xử lý</option>
-                        <option value="Đang xử lý">Đang xử lý</option>
-                        <option value="Đã xử lý">Đã xử lý</option>
-                        <option value="Đã trả máy">Đã trả máy</option>
-                    </select>
-                </div>
                 <div class="filter-item selection-toggle-item">
                     <label>&nbsp;</label>
-                    <button type="button" id="toggleSelectMode" class="btn-secondary">Chá»n</button>
+                    <button type="button" id="toggleSelectMode" class="btn-secondary">✅ Chọn</button>
                 </div>
                 <div id="batchSelectPanel" class="batch-select-panel hidden">
                     <div class="batch-select-head">
                         <div>
-                            <strong>Báº£ng chá»n</strong>
+                            <strong>🧩 Bảng chọn</strong>
                             <span id="selectedCountText">ChÆ°a chá»n phiáº¿u nÃ o</span>
                         </div>
-                        <button type="button" id="deleteSelectedBtn" class="btn-danger" disabled>XÃ³a Ä‘Ã£ chá»n</button>
+                        <button type="button" id="deleteSelectedBtn" class="btn-danger" disabled>🗑️ Xóa đã chọn</button>
                     </div>
                     <div class="batch-select-grid">
                         <div class="batch-filter-group">
-                            <label>Kiá»ƒu thá»i gian</label>
+                            <label>⏱️ Kiểu thời gian</label>
                             <div class="batch-filter-type">
-                                <label class="radio-chip">
-                                    <input type="radio" name="selectionTimeMode" value="preset" checked>
-                                    <span>Khung sáºµn</span>
-                                </label>
-                                <label class="radio-chip">
-                                    <input type="radio" name="selectionTimeMode" value="custom">
-                                    <span>TÃ¹y chá»n ngÃ y</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="batch-filter-group" id="presetFilterGroup">
-                            <label for="timePresetFilter">Chá»n khung thá»i gian</label>
-                            <select id="timePresetFilter">
-                                <option value="all">ToÃ n thá»i gian</option>
-                                <option value="today">HÃ´m nay</option>
-                                <option value="yesterday">HÃ´m qua</option>
-                                <option value="thisWeek">Tuáº§n nÃ y</option>
-                                <option value="lastWeek">Tuáº§n trÆ°á»›c</option>
-                                <option value="last7days">7 ngÃ y qua</option>
-                                <option value="thisMonth">ThÃ¡ng nÃ y</option>
-                                <option value="lastMonth">ThÃ¡ng trÆ°á»›c</option>
-                                <option value="last30days">30 ngÃ y qua</option>
-                                <option value="thisYear">NÄƒm nÃ y</option>
-                                <option value="lastYear">NÄƒm trÆ°á»›c</option>
-                            </select>
-                        </div>
-                        <div class="batch-filter-group hidden" id="customDateGroup">
-                            <label>Khoáº£ng ngÃ y cá»¥ thá»ƒ</label>
-                            <div class="custom-date-grid">
-                                <input type="date" id="customDateFrom">
-                                <input type="date" id="customDateTo">
+                                <span class="summary-empty">Dùng bộ lọc thời gian ở panel trái.</span>
                             </div>
                         </div>
                     </div>
@@ -127,7 +136,47 @@
                     <tbody id="repairList"></tbody>
                 </table>
             </div>
+
+            <div class="pagination-footer" id="paginationFooter">
+                <div class="pagination-block rows-block">
+                    <label for="rowsPerPageSelect">📄 Số dòng hiển thị</label>
+                    <select id="rowsPerPageSelect">
+                        <option value="15">15 dòng</option>
+                        <option value="30">30 dòng</option>
+                        <option value="50">50 dòng</option>
+                    </select>
+                </div>
+
+                <div class="pagination-block nav-block">
+                    <button type="button" id="prevPageBtn" class="btn-secondary pagination-btn">⬅️ Trang trước</button>
+                    <span id="pageIndicator" class="page-indicator">Trang 1/1</span>
+                    <button type="button" id="nextPageBtn" class="btn-secondary pagination-btn">Trang sau ➡️</button>
+                </div>
+
+                <div class="pagination-block info-block" id="paginationInfo">📊 Hiển thị 0-0 của tổng 0 dòng</div>
+            </div>
         </section>
+        </div>
+
+        <aside class="notes-sidebar" id="notesSidebar">
+            <div class="notes-card">
+                <div class="notes-header">
+                    <h3>📝 Checklist / Note</h3>
+                </div>
+            <div class="note-input-row">
+                 <input type="text" id="noteInput" placeholder="Nhập ghi chú..." />
+            </div>
+            <div id="noteList" class="note-list"></div>
+
+               
+
+                <div class="notes-pagination">
+                    <button type="button" id="notePrevBtn" class="btn-secondary pagination-btn">⬅️ Trước</button>
+                    <span id="notePageIndicator" class="page-indicator">Trang 1/1</span>
+                    <button type="button" id="noteNextBtn" class="btn-secondary pagination-btn">Sau ➡️</button>
+                </div>
+            </div>
+        </aside>
     </div>
 
     <!-- MODAL TẠO PHIẾU -->

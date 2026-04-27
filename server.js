@@ -104,6 +104,25 @@ function parseListQuery(query = {}) {
     return { q, status, limit, offset };
 }
 
+function sanitizeNotePayload(body = {}) {
+    return {
+        content: toTrimmedString(body.content, '')
+    };
+}
+
+function validateNotePayload(payload = {}) {
+    if (!payload.content) return 'Nội dung note không được để trống';
+    if (payload.content.length > 4000) return 'Nội dung note quá dài';
+    return null;
+}
+
+function parseNoteListQuery(query = {}) {
+    const limit = Math.min(Math.max(toPositiveInt(query.limit, 10), 1), 100);
+    const page = Math.max(toPositiveInt(query.page, 1), 1);
+    const offset = (page - 1) * limit;
+    return { page, limit, offset };
+}
+
 async function initDatabase() {
     pool = mysql.createPool(dbConfig);
 
@@ -123,6 +142,15 @@ async function initDatabase() {
                 ngayTra VARCHAR(20) NULL,
                 ghiChu TEXT NULL,
                 workNote TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        `);
+
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS notes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                content TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -181,6 +209,80 @@ app.use(express.static(__dirname, {
 /**
  * Routes
  */
+// ================= NOTES API =================
+
+// GET notes (có phân trang)
+app.get('/api/notes', asyncHandler(async (req, res) => {
+    const { page, limit, offset } = parseNoteListQuery(req.query);
+
+    const [rows] = await pool.query(
+        `SELECT * FROM notes ORDER BY id DESC LIMIT ? OFFSET ?`,
+        [limit, offset]
+    );
+
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM notes`);
+
+    res.json({
+        items: rows,
+        total,
+        page,
+        limit
+    });
+}));
+
+// POST note
+app.post('/api/notes', asyncHandler(async (req, res) => {
+    const payload = sanitizeNotePayload(req.body);
+    const error = validateNotePayload(payload);
+
+    if (error) {
+        return res.status(400).json({ message: error });
+    }
+
+    const [result] = await pool.query(
+        `INSERT INTO notes (content) VALUES (?)`,
+        [payload.content]
+    );
+
+    const [rows] = await pool.query(
+        `SELECT * FROM notes WHERE id = ?`,
+        [result.insertId]
+    );
+
+    res.status(201).json(rows[0]);
+}));
+
+// PUT note
+app.put('/api/notes/:id', asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const payload = sanitizeNotePayload(req.body);
+    const error = validateNotePayload(payload);
+
+    if (!id) return res.status(400).json({ message: 'ID không hợp lệ' });
+    if (error) return res.status(400).json({ message: error });
+
+    await pool.query(
+        `UPDATE notes SET content = ? WHERE id = ?`,
+        [payload.content, id]
+    );
+
+    const [rows] = await pool.query(
+        `SELECT * FROM notes WHERE id = ?`,
+        [id]
+    );
+
+    res.json(rows[0]);
+}));
+
+// DELETE note
+app.delete('/api/notes/:id', asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: 'ID không hợp lệ' });
+
+    await pool.query(`DELETE FROM notes WHERE id = ?`, [id]);
+
+    res.json({ success: true });
+}));
 app.get('/api/health', asyncHandler(async (req, res) => {
     const [rows] = await pool.query('SELECT 1 AS ok');
     res.json({
@@ -339,6 +441,96 @@ app.delete('/api/repairs', asyncHandler(async (req, res) => {
         deletedCount: result.affectedRows,
         ids: uniqueIds
     });
+}));
+
+app.get('/api/notes', asyncHandler(async (req, res) => {
+    const { page, limit, offset } = parseNoteListQuery(req.query);
+
+    const [countRows] = await pool.query('SELECT COUNT(*) AS total FROM notes');
+    const total = Number(countRows?.[0]?.total || 0);
+
+    const [rows] = await pool.query(
+        `
+        SELECT id, content, created_at, updated_at
+        FROM notes
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+        `,
+        [limit, offset]
+    );
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    res.json({
+        page,
+        limit,
+        total,
+        totalPages,
+        items: rows
+    });
+}));
+
+app.post('/api/notes', asyncHandler(async (req, res) => {
+    const payload = sanitizeNotePayload(req.body);
+    const error = validateNotePayload(payload);
+    if (error) return res.status(400).json({ message: error });
+
+    const [result] = await pool.query(
+        'INSERT INTO notes (content) VALUES (?)',
+        [payload.content]
+    );
+
+    const [rows] = await pool.query(
+        'SELECT id, content, created_at, updated_at FROM notes WHERE id = ?',
+        [result.insertId]
+    );
+
+    return res.status(201).json(rows[0]);
+}));
+
+app.put('/api/notes/:id', asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id || Number.isNaN(id)) {
+        return res.status(400).json({ message: 'ID note không hợp lệ' });
+    }
+
+    const payload = sanitizeNotePayload(req.body);
+    const error = validateNotePayload(payload);
+    if (error) return res.status(400).json({ message: error });
+
+    const [result] = await pool.query(
+        'UPDATE notes SET content = ? WHERE id = ?',
+        [payload.content, id]
+    );
+
+    if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Không tìm thấy note' });
+    }
+
+    const [rows] = await pool.query(
+        'SELECT id, content, created_at, updated_at FROM notes WHERE id = ?',
+        [id]
+    );
+
+    return res.json(rows[0]);
+}));
+
+app.delete('/api/notes/:id', asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id || Number.isNaN(id)) {
+        return res.status(400).json({ message: 'ID note không hợp lệ' });
+    }
+
+    const [result] = await pool.query(
+        'DELETE FROM notes WHERE id = ?',
+        [id]
+    );
+
+    if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Không tìm thấy note' });
+    }
+
+    return res.json({ deleted: true, id });
 }));
 
 /**
