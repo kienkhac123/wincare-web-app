@@ -206,13 +206,12 @@ class RepairManager {
 
             // ✏️ EDIT NOTE (click on text area)
             if (target.closest('.note-text') && item) {
-    const id = item.dataset.id;
-
-    // luôn cho phép chuyển note đang edit
-    if (id) {
-        this.startEditingNote(id);
-    }
-}
+                const id = item.dataset.id;
+                // Always allow switching to another note
+                if (id) {
+                    this.startEditingNote(id);
+                }
+            }
         });
 
         // EDIT INPUT: Event delegation for Enter key and blur
@@ -505,7 +504,7 @@ class RepairManager {
             const editInput = listEl.querySelector('.note-edit-input');
             if (editInput) {
                 editInput.focus();
-editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+                editInput.setSelectionRange(editInput.value.length, editInput.value.length);
             }
         }
     }
@@ -529,10 +528,10 @@ editInput.setSelectionRange(editInput.value.length, editInput.value.length);
         const id = inputEl.dataset.id;
         const value = inputEl.value.trim();
 if (!value) {
-    this.editingNoteId = null;
-    this.renderNotes();
-    return;
-}
+            this.editingNoteId = null;
+            this.renderNotes();
+            return;
+        }
         // Quick local update
         this.notes = this.notes.map(n =>
             Number(n.id) === Number(id) ? { ...n, content: value } : n
