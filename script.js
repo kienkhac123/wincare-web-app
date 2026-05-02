@@ -1235,16 +1235,37 @@ getDateRangeForSelectionFilter() {
     }
 
     async saveRepairWorkNote(id) {
-        const repair = this.repairs.find(r => r.id === id);
-        if (!repair) return;
-        const el = document.getElementById(`workNote-${id}`);
-        if (!el) return;
-        repair.workNote = (el.value || '').trim();
+    const textarea = document.getElementById(`workNote-${id}`);
+    if (!textarea) return;
 
-        this.saveLocalRepairs(this.repairs);
+    const workNote = textarea.value.trim();
+
+    try {
+        const res = await fetch(`/api/repairs/${id}/work-note`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ workNote })
+        });
+
+        if (!res.ok) throw new Error('Lỗi lưu');
+
+        const updated = await res.json();
+
+        // cập nhật local state để không bị mất khi render lại
+        const idx = this.repairs.findIndex(r => r.id === id);
+        if (idx >= 0) {
+            this.repairs[idx] = this.normalizeRepair(updated, id);
+        }
+
         this.showNotification('✅ Đã lưu ghi chú sửa chữa');
-        await this.backupToDrive(repair);
+
+    } catch (err) {
+        console.error(err);
+        this.showNotification('❌ Lỗi lưu ghi chú', 'error');
     }
+}
 
     async backupToDrive(repairData) {
         try {

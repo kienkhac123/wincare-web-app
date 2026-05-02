@@ -417,7 +417,26 @@ app.put('/api/repairs/:id/status', asyncHandler(async (req, res) => {
     console.log(`[API] PUT /api/repairs/${id}/status -> ${tinhTrang}`);
     return res.json(rows[0]);
 }));
+app.put('/api/repairs/:id/work-note', asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const workNote = (req.body.workNote || '').trim();
 
+    if (!id) {
+        return res.status(400).json({ message: 'ID không hợp lệ' });
+    }
+
+    await pool.query(
+        'UPDATE repairs SET workNote = ? WHERE id = ?',
+        [workNote, id]
+    );
+
+    const [rows] = await pool.query(
+        'SELECT * FROM repairs WHERE id = ?',
+        [id]
+    );
+
+    res.json(rows[0]);
+}));
 app.delete('/api/repairs', asyncHandler(async (req, res) => {
     const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
     const ids = rawIds
