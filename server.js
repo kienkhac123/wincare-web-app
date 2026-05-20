@@ -7,6 +7,7 @@ const mysql = require('mysql2/promise');
 
 const app = express();
 
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 
@@ -193,6 +194,12 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json({ limit: '1mb' }));
 
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        time: new Date()
+    });
+});
 // Static frontend
 //const publicDir = path.join(__dirname, 'public');
 //app.use(express.static(publicDir));
@@ -590,3 +597,12 @@ initDatabase()
         console.error('Database init failed:', error);
         process.exit(1);
     });
+process.on('SIGINT', async () => {
+    console.log('Shutting down gracefully...');
+
+    if (pool) {
+        await pool.end();
+    }
+
+    process.exit(0);
+});

@@ -4,8 +4,9 @@
   "description": "Backend API for Wincare.vn repair management",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
-  },
+  "start": "node server.js",
+  "dev": "node server.js"
+},
   "keywords": [
     "wincare",
     "express",
