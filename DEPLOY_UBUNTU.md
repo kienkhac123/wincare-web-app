@@ -6,7 +6,7 @@ This guide targets the current server:
 - SSH user: `iamkin`
 - LAN IP: `192.168.1.16`
 - App path: `/var/www/wincare`
-- Node process: PM2 app `wincare`
+- Node process: systemd service `wincare`
 - MariaDB data path: `/data/mysql`
 - Public access: Tailscale Funnel
 
@@ -18,7 +18,7 @@ Use the services already installed:
 Internet
   -> Tailscale Funnel public HTTPS URL
   -> Nginx on localhost/LAN port 80
-  -> Node app managed by PM2 on 127.0.0.1:3000
+  -> Node app managed by systemd on 127.0.0.1:3000
   -> MariaDB on 127.0.0.1:3306
 ```
 
@@ -45,7 +45,7 @@ Keep ordinary OpenSSH if this already works over the tailnet. Tailscale SSH is o
 - `ssh`: server administration.
 - `ufw`: firewall rules.
 - `mariadb`: app database, still using `/data/mysql`.
-- `pm2`: keeps the Node app alive and restores it after reboot.
+- `systemd`: keeps the Node app alive and starts it after reboot.
 - `nginx`: one local reverse proxy in front of Node.
 - `tailscaled` and Tailscale Funnel: public HTTPS URL without opening home router ports.
 
@@ -63,11 +63,14 @@ Keep ordinary OpenSSH if this already works over the tailnet. Tailscale SSH is o
 sudo unlink /etc/nginx/sites-enabled/default
 ```
 
-- Remove old duplicate PM2 app entries if `pm2 list` shows more than one Wincare process:
+- Remove PM2 after the `wincare` systemd service is working:
 
 ```bash
-pm2 delete <old-process-name-or-id>
-pm2 save
+pm2 kill
+sudo systemctl stop pm2-iamkin
+sudo systemctl disable pm2-iamkin
+sudo rm -f /etc/systemd/system/pm2-iamkin.service
+sudo systemctl daemon-reload
 ```
 
 - Remove old UFW allow rules for `3000` or `3306` if they exist:
@@ -132,6 +135,18 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+## systemd service
+
+Create `/etc/systemd/system/wincare.service` from the repo template:
+
+```bash
+sudo cp /var/www/wincare/deploy/wincare.service /etc/systemd/system/wincare.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now wincare
+```
+
+The unit uses `/var/www/wincare/.env` through `EnvironmentFile=`. Keep database credentials there instead of embedding them in the service file.
+
 ## First deploy
 
 ```bash
@@ -139,15 +154,10 @@ ssh iamkin@192.168.1.16
 cd /var/www/wincare
 git pull origin main
 npm ci --omit=dev
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-```
-
-Run the `sudo ...` command printed by `pm2 startup`, then save again:
-
-```bash
-pm2 save
+sudo cp /var/www/wincare/deploy/wincare.service /etc/systemd/system/wincare.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now wincare
+sudo systemctl status wincare
 ```
 
 ## Update deploy
@@ -157,7 +167,7 @@ ssh iamkin@192.168.1.16
 cd /var/www/wincare
 git pull origin main
 npm ci --omit=dev
-pm2 restart wincare
+sudo systemctl restart wincare
 curl http://127.0.0.1:3000/health
 curl http://127.0.0.1/health
 ```
@@ -193,8 +203,8 @@ For this architecture, allow SSH. Port `80` can stay open only if LAN access thr
 ## Health checks
 
 ```bash
-pm2 list
-pm2 logs wincare --lines 100
+sudo systemctl status wincare
+sudo journalctl -u wincare -n 100 --no-pager
 sudo systemctl status nginx
 sudo systemctl status mariadb
 sudo systemctl status tailscaled

@@ -20,5 +20,5 @@ git push origin main
 cd /var/www/wincare
 git pull origin main
 npm ci --omit=dev
-pm2 restart wincare
+sudo systemctl restart wincare
 ```
