@@ -2,14 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
 const mysql = require('mysql2/promise');
 
 const app = express();
 
 app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT || 3000);
-const HOST = '0.0.0.0';
+const HOST = process.env.HOST || '0.0.0.0';
 
 const ALLOWED_STATUSES = ['Chưa xử lý', 'Đang xử lý', 'Đã xử lý', 'Đã trả máy'];
 
@@ -228,10 +227,12 @@ app.get('/api/notes', asyncHandler(async (req, res) => {
     );
 
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM notes`);
+    const totalPages = Math.max(1, Math.ceil(Number(total || 0) / limit));
 
     res.json({
         items: rows,
         total,
+        totalPages,
         page,
         limit
     });
@@ -467,96 +468,6 @@ app.delete('/api/repairs', asyncHandler(async (req, res) => {
         deletedCount: result.affectedRows,
         ids: uniqueIds
     });
-}));
-
-app.get('/api/notes', asyncHandler(async (req, res) => {
-    const { page, limit, offset } = parseNoteListQuery(req.query);
-
-    const [countRows] = await pool.query('SELECT COUNT(*) AS total FROM notes');
-    const total = Number(countRows?.[0]?.total || 0);
-
-    const [rows] = await pool.query(
-        `
-        SELECT id, content, created_at, updated_at
-        FROM notes
-        ORDER BY id DESC
-        LIMIT ? OFFSET ?
-        `,
-        [limit, offset]
-    );
-
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    res.json({
-        page,
-        limit,
-        total,
-        totalPages,
-        items: rows
-    });
-}));
-
-app.post('/api/notes', asyncHandler(async (req, res) => {
-    const payload = sanitizeNotePayload(req.body);
-    const error = validateNotePayload(payload);
-    if (error) return res.status(400).json({ message: error });
-
-    const [result] = await pool.query(
-        'INSERT INTO notes (content) VALUES (?)',
-        [payload.content]
-    );
-
-    const [rows] = await pool.query(
-        'SELECT id, content, created_at, updated_at FROM notes WHERE id = ?',
-        [result.insertId]
-    );
-
-    return res.status(201).json(rows[0]);
-}));
-
-app.put('/api/notes/:id', asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
-    if (!id || Number.isNaN(id)) {
-        return res.status(400).json({ message: 'ID note không hợp lệ' });
-    }
-
-    const payload = sanitizeNotePayload(req.body);
-    const error = validateNotePayload(payload);
-    if (error) return res.status(400).json({ message: error });
-
-    const [result] = await pool.query(
-        'UPDATE notes SET content = ? WHERE id = ?',
-        [payload.content, id]
-    );
-
-    if (result.affectedRows === 0) {
-        return res.status(404).json({ message: 'Không tìm thấy note' });
-    }
-
-    const [rows] = await pool.query(
-        'SELECT id, content, created_at, updated_at FROM notes WHERE id = ?',
-        [id]
-    );
-
-    return res.json(rows[0]);
-}));
-
-app.delete('/api/notes/:id', asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
-    if (!id || Number.isNaN(id)) {
-        return res.status(400).json({ message: 'ID note không hợp lệ' });
-    }
-
-    const [result] = await pool.query(
-        'DELETE FROM notes WHERE id = ?',
-        [id]
-    );
-
-    if (result.affectedRows === 0) {
-        return res.status(404).json({ message: 'Không tìm thấy note' });
-    }
-
-    return res.json({ deleted: true, id });
 }));
 
 /**

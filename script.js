@@ -41,64 +41,6 @@ class RepairManager {
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(repairs || []));
     }
 
-    ensureLocalSeedData() {
-        const existing = this.getLocalRepairs();
-        if (existing.length) return existing;
-
-        const now = new Date();
-        const today = this.formatDateVN(now);
-        const twoDaysAgo = this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2));
-        const fourDaysAgo = this.formatDateVN(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4));
-
-        const seed = [
-            {
-                id: 1,
-                ngayNhan: today,
-                tenKhach: 'Nguyễn Văn An',
-                sdt: '0911111111',
-                tenMay: 'Dell Inspiron 15',
-                moTaLoi: 'Không lên nguồn',
-                phuongAnXuLi: 'Xử lý tại cửa hàng',
-                tinhTrang: 'Chưa xử lý',
-                ngayTra: null,
-                ghiChu: 'Khách cần gấp',
-                workNote: '',
-                invoice: null
-            },
-            {
-                id: 2,
-                ngayNhan: twoDaysAgo,
-                tenKhach: 'Trần Thị Bình',
-                sdt: '0922222222',
-                tenMay: 'HP Pavilion',
-                moTaLoi: 'Nóng máy, quạt kêu to',
-                phuongAnXuLi: 'Xử lý tại cửa hàng',
-                tinhTrang: 'Đang xử lý',
-                ngayTra: null,
-                ghiChu: '',
-                workNote: '',
-                invoice: null
-            },
-            {
-                id: 3,
-                ngayNhan: fourDaysAgo,
-                tenKhach: 'Lê Minh Cường',
-                sdt: '0933333333',
-                tenMay: 'MacBook Pro 2019',
-                moTaLoi: 'Bàn phím liệt vài nút',
-                phuongAnXuLi: 'Gửi trung tâm bảo hành',
-                tinhTrang: 'Chưa xử lý',
-                ngayTra: null,
-                ghiChu: 'Đã kiểm tra ngoại quan',
-                workNote: '',
-                invoice: null
-            }
-        ];
-
-        this.saveLocalRepairs(seed);
-        return seed;
-    }
-
     async apiRequest(url, method = 'GET', data = null) {
         const options = {
             method,
@@ -236,11 +178,12 @@ class RepairManager {
                     await this.addNoteFromInput(noteInput);
                 }
             });
-
-            noteInput.addEventListener('blur', async () => {
-                await this.addNoteFromInput(noteInput);
-            });
         }
+        document.getElementById('addNoteBtn')?.addEventListener('click', async () => {
+            if (!noteInput) return;
+            await this.addNoteFromInput(noteInput);
+            noteInput.focus();
+        });
         document.getElementById('rowsPerPageSelect')?.addEventListener('change', (e) => {
             const nextRows = Number(e.target.value) || 15;
             this.rowsPerPage = [15, 30, 50].includes(nextRows) ? nextRows : 15;
@@ -377,41 +320,26 @@ class RepairManager {
 
     async fetchNotes() {
         try {
-            const data = await this.apiRequest(`${this.API_BASE}/api/notes?limit=200&page=1`, 'GET');
-            this.notes = Array.isArray(data?.items) ? data.items : [];
+            const notes = [];
+            const limit = 100;
+            let page = 1;
+            let totalPages = 1;
+
+            do {
+                const data = await this.apiRequest(`${this.API_BASE}/api/notes?limit=${limit}&page=${page}`, 'GET');
+                notes.push(...(Array.isArray(data?.items) ? data.items : []));
+                totalPages = Math.max(1, Number(data?.totalPages) || 1);
+                page += 1;
+            } while (page <= totalPages);
+
+            this.notes = notes;
+            this.noteCurrentPage = Math.min(this.noteCurrentPage, this.getNoteTotalPages());
         } catch (error) {
             console.error('fetchNotes error:', error);
             this.notes = [];
         }
     }
 
-    formatDateTimeVN(input) {
-        const d = new Date(input);
-        if (Number.isNaN(d.getTime())) return '-';
-        return d.toLocaleString('vi-VN');
-    }
-
-    async createNote() {
-        const content = window.prompt('Nhập nội dung note/checklist:');
-        if (content === null) return;
-        const trimmed = String(content || '').trim();
-        if (!trimmed) {
-            this.showNotification('❌ Nội dung note không được để trống', 'error');
-            return;
-        }
-
-        try {
-            const created = await this.apiRequest(`${this.API_BASE}/api/notes`, 'POST', { content: trimmed });
-            this.notes = [created, ...this.notes];
-            this.noteCurrentPage = 1;
-            this.renderNotes();
-            this.showNotification('✅ Đã thêm note');
-        } catch (error) {
-            console.error('createNote error:', error);
-            this.showNotification(`❌ Lỗi thêm note: ${error.message}`, 'error');
-        }
-        
-    }
     async addNoteFromInput(input) {
     const value = input.value.trim();
     if (!value) return;
@@ -422,6 +350,7 @@ class RepairManager {
         });
 
         this.notes = [created, ...this.notes];
+        this.noteCurrentPage = 1;
 
         input.value = '';
 
@@ -430,30 +359,6 @@ class RepairManager {
         console.error(error);
     }
 }
-    async editNote(id) {
-        const note = this.notes.find((n) => Number(n.id) === Number(id));
-        if (!note) return;
-
-        const next = window.prompt('Sửa nội dung note:', note.content || '');
-        if (next === null) return;
-        const trimmed = String(next || '').trim();
-        if (!trimmed) {
-            this.showNotification('❌ Nội dung note không được để trống', 'error');
-            return;
-        }
-
-        try {
-            const updated = await this.apiRequest(`${this.API_BASE}/api/notes/${id}`, 'PUT', { content: trimmed });
-            this.notes = this.notes.map((n) => (Number(n.id) === Number(id) ? updated : n));
-            this.openNoteMenuId = null;
-            this.renderNotes();
-            this.showNotification('✅ Đã cập nhật note');
-        } catch (error) {
-            console.error('editNote error:', error);
-            this.showNotification(`❌ Lỗi sửa note: ${error.message}`, 'error');
-        }
-    }
-
     async deleteNote(id) {
         const ok = window.confirm('Bạn có chắc muốn xóa note này?');
         if (!ok) return;
@@ -483,10 +388,16 @@ class RepairManager {
 
         if (!this.notes || this.notes.length === 0) {
             listEl.innerHTML = '<div class="summary-empty">Chưa có note nào.</div>';
+            this.renderNotePagination();
             return;
         }
 
-        listEl.innerHTML = this.notes.map(note => {
+        const totalPages = this.getNoteTotalPages();
+        this.noteCurrentPage = Math.min(Math.max(1, this.noteCurrentPage), totalPages);
+        const pageStart = (this.noteCurrentPage - 1) * this.noteRowsPerPage;
+        const pageNotes = this.notes.slice(pageStart, pageStart + this.noteRowsPerPage);
+
+        listEl.innerHTML = pageNotes.map(note => {
             const isEditing = this.editingNoteId == note.id;
             return `
             <div class="note-item" data-id="${note.id}">
@@ -498,6 +409,7 @@ class RepairManager {
                 <button class="note-delete" data-id="${note.id}">×</button>
             </div>
         `}).join('');
+        this.renderNotePagination();
 
         // Focus the edit input if editing - delay to ensure DOM is ready
         if (this.editingNoteId) {
@@ -512,6 +424,22 @@ class RepairManager {
                 }
             }, 0);
         }
+    }
+
+    getNoteTotalPages() {
+        return Math.max(1, Math.ceil(this.notes.length / this.noteRowsPerPage));
+    }
+
+    renderNotePagination() {
+        const totalPages = this.getNoteTotalPages();
+        const prevBtn = document.getElementById('notePrevBtn');
+        const nextBtn = document.getElementById('noteNextBtn');
+        const indicator = document.getElementById('notePageIndicator');
+
+        this.noteCurrentPage = Math.min(Math.max(1, this.noteCurrentPage), totalPages);
+        if (prevBtn) prevBtn.disabled = this.noteCurrentPage <= 1 || this.notes.length === 0;
+        if (nextBtn) nextBtn.disabled = this.noteCurrentPage >= totalPages || this.notes.length === 0;
+        if (indicator) indicator.textContent = `Trang ${this.noteCurrentPage}/${totalPages}`;
     }
 
     // Escape HTML to prevent XSS
@@ -591,16 +519,25 @@ if (!value) {
     async fetchRepairs() {
         try {
             const localById = new Map(this.getLocalRepairs().map((r) => [Number(r?.id), r]));
-            const data = await this.apiRequest(`${this.API_BASE}/api/repairs`, 'GET');
-            this.repairs = Array.isArray(data)
-                ? data.map((r, idx) => {
+            const repairs = [];
+            const limit = 1000;
+            let offset = 0;
+            let batch = [];
+
+            do {
+                batch = await this.apiRequest(`${this.API_BASE}/api/repairs?limit=${limit}&offset=${offset}`, 'GET');
+                if (!Array.isArray(batch)) break;
+                repairs.push(...batch);
+                offset += batch.length;
+            } while (batch.length === limit);
+
+            this.repairs = repairs.map((r, idx) => {
                     const normalized = this.normalizeRepair(r, idx + 1);
                     const local = localById.get(Number(normalized.id));
                     if (local?.invoice) normalized.invoice = local.invoice;
                     if (local?.invoiceDraft) normalized.invoiceDraft = local.invoiceDraft;
                     return normalized;
-                })
-                : [];
+                });
             this.saveLocalRepairs(this.repairs);
         } catch (error) {
             console.error('fetchRepairs error:', error);
@@ -1217,8 +1154,41 @@ getDateRangeForSelectionFilter() {
         this.renderTable();
     }
 
+    resetFiltersForRepairJump() {
+        this.searchKeyword = '';
+        this.statusFilter = 'all';
+        this.selectionTimePreset = 'all';
+        this.selectionDateFrom = '';
+        this.selectionDateTo = '';
+
+        const searchInput = document.getElementById('searchInput');
+        const statusFilter = document.getElementById('statusFilter');
+        const presetFilter = document.getElementById('timePresetFilter');
+        const dateFrom = document.getElementById('customDateFrom');
+        const dateTo = document.getElementById('customDateTo');
+
+        if (searchInput) searchInput.value = '';
+        if (statusFilter) statusFilter.value = 'all';
+        if (presetFilter) presetFilter.value = 'all';
+        if (dateFrom) dateFrom.value = '';
+        if (dateTo) dateTo.value = '';
+    }
+
     jumpToRepair(id) {
         if (!id || Number.isNaN(id)) return;
+
+        let filteredRepairs = this.getFilteredRepairs();
+        let repairIndex = filteredRepairs.findIndex((repair) => repair.id === id);
+
+        if (repairIndex < 0) {
+            this.resetFiltersForRepairJump();
+            filteredRepairs = this.getFilteredRepairs();
+            repairIndex = filteredRepairs.findIndex((repair) => repair.id === id);
+        }
+
+        if (repairIndex < 0) return;
+
+        this.currentPage = Math.floor(repairIndex / this.rowsPerPage) + 1;
         this.expandedRepairId = id;
         this.renderTable();
 
@@ -1256,7 +1226,13 @@ getDateRangeForSelectionFilter() {
         // cập nhật local state để không bị mất khi render lại
         const idx = this.repairs.findIndex(r => r.id === id);
         if (idx >= 0) {
-            this.repairs[idx] = this.normalizeRepair(updated, id);
+            const localRepair = this.repairs[idx];
+            this.repairs[idx] = {
+                ...this.normalizeRepair(updated, id),
+                invoice: localRepair.invoice || null,
+                invoiceDraft: localRepair.invoiceDraft || null
+            };
+            this.saveLocalRepairs(this.repairs);
         }
 
         this.showNotification('✅ Đã lưu ghi chú sửa chữa');

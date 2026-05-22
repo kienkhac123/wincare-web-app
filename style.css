@@ -30,9 +30,9 @@ body {
 }
 
 .app-shell {
-    max-width: 1880px;
+    max-width: 1960px;
     margin: 0 auto;
-    padding: 10px 16px 20px;
+    padding: 10px 10px 20px;
     display: grid;
     grid-template-columns: 280px minmax(860px, 1fr) 320px;
     gap: 12px;
@@ -569,6 +569,19 @@ th, td {
 #repairTable th.select-cell {
     text-align: center;
     vertical-align: middle;
+}
+
+#repairTable th:nth-last-child(-n + 2) {
+    text-align: center;
+}
+
+#repairTable .status-select {
+    display: block;
+    width: min(100%, 148px);
+    margin: 0 auto;
+    padding: 10px 34px 10px 12px;
+    text-align: center;
+    text-align-last: center;
 }
 
 .select-cell {
@@ -1267,12 +1280,37 @@ tr:hover {
     background: #e74c3c;
     color: white;
 }
+.note-input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .note-input-row input {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: 6px;
     border: none;
     border-bottom: 1px dashed #ccc;
     outline: none;
+}
+
+.note-add-btn {
+    width: 22px;
+    height: 22px;
+    border: 1px solid #cfd6dc;
+    border-radius: 50%;
+    background: #eef1f3;
+    color: #7f8c8d;
+    cursor: pointer;
+    font-size: 17px;
+    line-height: 1;
+    padding: 0 0 2px;
+}
+
+.note-add-btn:hover {
+    background: #dfe5e8;
+    color: #5f6b70;
 }
 
 .note-item {
